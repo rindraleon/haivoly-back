@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Utilisateur {
+  id        String     @id @default(uuid())
+  nom       String
+  prenom    String
+  email     String     @unique
+  telephone String?
+  password  String
+  creeA     DateTime   @default(now())
+  modifieA  DateTime   @updatedAt
+  role      Role       @default(AGRICULTEUR)
+  parcelles Parcelle[]
+}
+
+enum Role {
+  AGRICULTEUR
+  PROPRIETAIRE
+}
+
+enum StatutParcelle {
+  ACTIVE
+  ABANDONNEE
+  ARCHIVEE
+  SUPPRIMEE
+}
+
+enum TypeIntervention {
+  PLANTATION
+  IRRIGATION
+  FERTILISATION
+  DESHERBAGE
+  TRAITEMENT
+  ENTRETIEN
+  INSPECTION
+  AUTRE
+}
+
+model Parcelle {
+  id            String   @id @default(uuid())
+  nom           String
+  superficie    Float?
+  typeSol       String?
+  latitude      Float?
+  longitude     Float?
+  creeA         DateTime @default(now())
+  utilisateurId String
+  description   String?
+  modifieA      DateTime @updatedAt
+
+  statut            StatutParcelle @default(ACTIVE)
+  raisonSuppression String?
+
+  cultures    Culture[]
+  utilisateur Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+  pointsGPS   PointGPS[]
+}
+
+enum StatutCulture {
+  PLANIFIEE
+  EN_COURS
+  RECOLTEE
+  ABANDONNEE
+  SUPPRIMEE
+}
+
+model Culture {
+  id                String        @id @default(uuid())
+  nom               String
+  type              String?
+  variete           String?
+  datePlantation    DateTime?
+  datePrevueRecolte DateTime?
+  description       String?
+  stade             String?
+  statut            StatutCulture @default(PLANIFIEE)
+  raisonSuppression String?
+  creeA             DateTime      @default(now())
+  modifieA          DateTime      @updatedAt
+  parcelleId        String
+  parcelle          Parcelle      @relation(fields: [parcelleId], references: [id], onDelete: Cascade)
+
+  interventions Intervention[]
+  observations  Observation[]
+  pointsGPS     PointGPSCulture[]
+  recolte       Recolte?
+}
+
+model PointGPSCulture {
+  id        String   @id @default(uuid())
+  latitude  Float
+  longitude Float
+  ordre     Int
+  creeA     DateTime @default(now())
+  modifieA  DateTime @updatedAt
+
+  cultureId String
+  culture   Culture @relation(fields: [cultureId], references: [id], onDelete: Cascade)
+
+  @@unique([cultureId, ordre])
+}
+
+model Intervention {
+  id          String   @id @default(uuid())
+  type        String
+  description String?
+  date        DateTime @default(now())
+
+  produit  String?
+  quantite Float?
+  unite    String?
+  cout     Float?
+
+  cultureId String
+  creeA     DateTime @default(now())
+  modifieA  DateTime @updatedAt
+
+  culture Culture             @relation(fields: [cultureId], references: [id], onDelete: Cascade)
+  photos  PhotoIntervention[]
+}
+
+model PointGPS {
+  id         String   @id @default(uuid())
+  ordre      Int
+  latitude   Float
+  longitude  Float
+  parcelleId String
+  creeA      DateTime @default(now()) @db.Timestamptz(3)
+  modifieA   DateTime @updatedAt @db.Timestamptz(3)
+  parcelle   Parcelle @relation(fields: [parcelleId], references: [id], onDelete: Cascade)
+
+  @@unique([parcelleId, ordre])
+}
+
+model PhotoIntervention {
+  id             String   @id @default(uuid())
+  url            String
+  dateAjout      DateTime @default(now())
+  description    String?
+  interventionId String
+
+  intervention Intervention @relation(fields: [interventionId], references: [id], onDelete: Cascade)
+}
+
+model Photo {
+  id            String      @id @default(uuid())
+  url           String
+  dateAjout     DateTime    @default(now())
+  observationId String
+  observation   Observation @relation(fields: [observationId], references: [id], onDelete: Cascade)
+}
+
+model Observation {
+  id          String   @id @default(uuid())
+  description String
+  date        DateTime @default(now())
+  cultureId   String
+  modifieA    DateTime @updatedAt
+  culture     Culture  @relation(fields: [cultureId], references: [id], onDelete: Cascade)
+  photos      Photo[]
+}
+
+model Recolte {
+  id          String   @id @default(uuid())
+  dateRecolte DateTime
+  quantite    Float
+  unite       String
+  description String?
+  prixVente   Float?
+  coutRecolte Float?
+  creeA       DateTime @default(now())
+  modifieA    DateTime @updatedAt
+
+  cultureId String   @unique
+  culture   Culture  @relation( fields: [cultureId], references: [id], onDelete: Cascade)
+
+  photos PhotoRecolte[]
+}
+model PhotoRecolte {
+  id        String   @id @default(uuid())
+  url       String
+  dateAjout DateTime @default(now())
+  recolteId String
+
+  recolte   Recolte  @relation( fields: [recolteId], references: [id], onDelete: Cascade)
+}

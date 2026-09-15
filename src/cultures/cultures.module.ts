@@ -6,16 +6,10 @@ import { CulturesService } from './cultures.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-  ],
+  imports: [PrismaModule],
 
-  controllers: [
-    CulturesController,
-  ],
+  controllers: [CulturesController],
 
-  providers: [
-    CulturesService,
-  ],
+  providers: [CulturesService],
 })
 export class CulturesModule {}

@@ -11,9 +11,7 @@ import { UpdatePhotoDto } from './dto/modification-photo.dto';
 
 @Injectable()
 export class PhotosService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // =========================
   // VÉRIFIER L'OBSERVATION
@@ -23,34 +21,27 @@ export class PhotosService {
     cultureId: string,
     utilisateurId: string,
   ) {
-    const observation =
-      await this.prisma.observation.findFirst({
-        where: {
-          id: observationId,
-          cultureId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+    const observation = await this.prisma.observation.findFirst({
+      where: {
+        id: observationId,
+        cultureId,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-        include: {
-          culture: true,
-        },
-      });
+      },
+      include: {
+        culture: true,
+      },
+    });
 
     if (!observation) {
-      throw new NotFoundException(
-        'Observation introuvable',
-      );
+      throw new NotFoundException('Observation introuvable');
     }
 
-    if (
-      observation.culture.statut === 'SUPPRIMEE'
-    ) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+    if (observation.culture.statut === 'SUPPRIMEE') {
+      throw new NotFoundException('Culture introuvable');
     }
 
     return observation;
@@ -65,12 +56,11 @@ export class PhotosService {
     dto: CreatePhotoDto,
     utilisateurId: string,
   ) {
-    const observation =
-      await this.verifierObservation(
-        observationId,
-        cultureId,
-        utilisateurId,
-      );
+    const observation = await this.verifierObservation(
+      observationId,
+      cultureId,
+      utilisateurId,
+    );
 
     if (
       observation.culture.statut === 'RECOLTEE' ||
@@ -98,12 +88,11 @@ export class PhotosService {
     utilisateurId: string,
     url: string,
   ) {
-    const observation =
-      await this.verifierObservation(
-        observationId,
-        cultureId,
-        utilisateurId,
-      );
+    const observation = await this.verifierObservation(
+      observationId,
+      cultureId,
+      utilisateurId,
+    );
 
     if (
       observation.culture.statut === 'RECOLTEE' ||
@@ -130,11 +119,7 @@ export class PhotosService {
     cultureId: string,
     utilisateurId: string,
   ) {
-    await this.verifierObservation(
-      observationId,
-      cultureId,
-      utilisateurId,
-    );
+    await this.verifierObservation(observationId, cultureId, utilisateurId);
 
     return this.prisma.photo.findMany({
       where: {
@@ -155,24 +140,17 @@ export class PhotosService {
     id: string,
     utilisateurId: string,
   ) {
-    await this.verifierObservation(
-      observationId,
-      cultureId,
-      utilisateurId,
-    );
+    await this.verifierObservation(observationId, cultureId, utilisateurId);
 
-    const photo =
-      await this.prisma.photo.findFirst({
-        where: {
-          id,
-          observationId,
-        },
-      });
+    const photo = await this.prisma.photo.findFirst({
+      where: {
+        id,
+        observationId,
+      },
+    });
 
     if (!photo) {
-      throw new NotFoundException(
-        'Photo introuvable',
-      );
+      throw new NotFoundException('Photo introuvable');
     }
 
     return photo;
@@ -188,12 +166,11 @@ export class PhotosService {
     dto: UpdatePhotoDto,
     utilisateurId: string,
   ) {
-    const observation =
-      await this.verifierObservation(
-        observationId,
-        cultureId,
-        utilisateurId,
-      );
+    const observation = await this.verifierObservation(
+      observationId,
+      cultureId,
+      utilisateurId,
+    );
 
     if (
       observation.culture.statut === 'RECOLTEE' ||
@@ -204,12 +181,7 @@ export class PhotosService {
       );
     }
 
-    await this.findOne(
-      observationId,
-      cultureId,
-      id,
-      utilisateurId,
-    );
+    await this.findOne(observationId, cultureId, id, utilisateurId);
 
     return this.prisma.photo.update({
       where: {
@@ -232,12 +204,11 @@ export class PhotosService {
     id: string,
     utilisateurId: string,
   ) {
-    const observation =
-      await this.verifierObservation(
-        observationId,
-        cultureId,
-        utilisateurId,
-      );
+    const observation = await this.verifierObservation(
+      observationId,
+      cultureId,
+      utilisateurId,
+    );
 
     if (
       observation.culture.statut === 'RECOLTEE' ||
@@ -248,12 +219,7 @@ export class PhotosService {
       );
     }
 
-    await this.findOne(
-      observationId,
-      cultureId,
-      id,
-      utilisateurId,
-    );
+    await this.findOne(observationId, cultureId, id, utilisateurId);
 
     return this.prisma.photo.delete({
       where: {

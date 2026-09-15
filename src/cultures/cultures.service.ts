@@ -12,9 +12,7 @@ import { UpdateCultureDto } from './dto/modification-culture.dto';
 
 @Injectable()
 export class CulturesService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // =========================
   // CRÉER UNE CULTURE
@@ -32,9 +30,7 @@ export class CulturesService {
     });
 
     if (!parcelle) {
-      throw new NotFoundException(
-        'Parcelle introuvable',
-      );
+      throw new NotFoundException('Parcelle introuvable');
     }
 
     // Une parcelle supprimée ne peut plus recevoir
@@ -49,8 +45,7 @@ export class CulturesService {
     if (
       dto.datePlantation &&
       dto.datePrevueRecolte &&
-      new Date(dto.datePrevueRecolte) <
-        new Date(dto.datePlantation)
+      new Date(dto.datePrevueRecolte) < new Date(dto.datePlantation)
     ) {
       throw new BadRequestException(
         'La date prévue de récolte doit être après la date de plantation',
@@ -85,10 +80,7 @@ export class CulturesService {
   // =========================
   // RÉCUPÉRER LES CULTURES
   // =========================
-  async findAll(
-    parcelleId: string,
-    utilisateurId: string,
-  ) {
+  async findAll(parcelleId: string, utilisateurId: string) {
     const parcelle = await this.prisma.parcelle.findFirst({
       where: {
         id: parcelleId,
@@ -97,9 +89,7 @@ export class CulturesService {
     });
 
     if (!parcelle) {
-      throw new NotFoundException(
-        'Parcelle introuvable',
-      );
+      throw new NotFoundException('Parcelle introuvable');
     }
 
     return this.prisma.culture.findMany({
@@ -115,11 +105,7 @@ export class CulturesService {
   // =========================
   // RÉCUPÉRER UNE CULTURE
   // =========================
-  async findOne(
-    parcelleId: string,
-    id: string,
-    utilisateurId: string,
-  ) {
+  async findOne(parcelleId: string, id: string, utilisateurId: string) {
     const culture = await this.prisma.culture.findFirst({
       where: {
         id,
@@ -131,68 +117,52 @@ export class CulturesService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     return culture;
   }
 
   // =========================
-// VÉRIFIER LA TRANSITION
-// DE STATUT
-// =========================
-private verifierTransitionStatut(
-  actuel: StatutCulture,
-  nouveau: StatutCulture,
-) {
-  if (actuel === nouveau) {
-    throw new BadRequestException(
-      `La culture est déjà au statut ${actuel}`,
-    );
-  }
-
-  const transitionsAutorisees: Record<
-    StatutCulture,
-    StatutCulture[]
-  > = {
-    // PLANIFIEE peut aller vers tous les autres statuts
-    PLANIFIEE: [
-      StatutCulture.EN_COURS,
-      StatutCulture.ABANDONNEE,
-      StatutCulture.SUPPRIMEE,
-    ],
-
-    // EN_COURS peut uniquement être récoltée
-    EN_COURS: [
-      StatutCulture.RECOLTEE,
-    ],
-
-    // Une culture récoltée ne peut plus changer
-    RECOLTEE: [],
-
-    // Une culture abandonnée peut être replanifiée
-    // ou supprimée
-    ABANDONNEE: [
-      StatutCulture.PLANIFIEE,
-      StatutCulture.SUPPRIMEE,
-    ],
-
-    // Une culture supprimée ne peut plus être modifiée
-    SUPPRIMEE: [],
-  };
-
-  if (
-    !transitionsAutorisees[actuel].includes(
-      nouveau,
-    )
+  // VÉRIFIER LA TRANSITION
+  // DE STATUT
+  // =========================
+  private verifierTransitionStatut(
+    actuel: StatutCulture,
+    nouveau: StatutCulture,
   ) {
-    throw new BadRequestException(
-      `Transition de statut impossible : ${actuel} → ${nouveau}`,
-    );
+    if (actuel === nouveau) {
+      throw new BadRequestException(`La culture est déjà au statut ${actuel}`);
+    }
+
+    const transitionsAutorisees: Record<StatutCulture, StatutCulture[]> = {
+      // PLANIFIEE peut aller vers tous les autres statuts
+      PLANIFIEE: [
+        StatutCulture.EN_COURS,
+        StatutCulture.ABANDONNEE,
+        StatutCulture.SUPPRIMEE,
+      ],
+
+      // EN_COURS peut uniquement être récoltée
+      EN_COURS: [StatutCulture.RECOLTEE],
+
+      // Une culture récoltée ne peut plus changer
+      RECOLTEE: [],
+
+      // Une culture abandonnée peut être replanifiée
+      // ou supprimée
+      ABANDONNEE: [StatutCulture.PLANIFIEE, StatutCulture.SUPPRIMEE],
+
+      // Une culture supprimée ne peut plus être modifiée
+      SUPPRIMEE: [],
+    };
+
+    if (!transitionsAutorisees[actuel].includes(nouveau)) {
+      throw new BadRequestException(
+        `Transition de statut impossible : ${actuel} → ${nouveau}`,
+      );
+    }
   }
-}
 
   // =========================
   // MODIFIER UNE CULTURE
@@ -214,27 +184,22 @@ private verifierTransitionStatut(
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
+      throw new NotFoundException('Culture introuvable');
+    }
+
+    // Une culture récoltée ou supprimée ne peut plus être modifiée
+    if (
+      culture.statut === StatutCulture.RECOLTEE ||
+      culture.statut === StatutCulture.SUPPRIMEE
+    ) {
+      throw new BadRequestException(
+        'Impossible de modifier une culture récoltée ou supprimée',
       );
     }
 
-  // Une culture récoltée ou supprimée ne peut plus être modifiée
-if (
-  culture.statut === StatutCulture.RECOLTEE ||
-  culture.statut === StatutCulture.SUPPRIMEE
-) {
-  throw new BadRequestException(
-    'Impossible de modifier une culture récoltée ou supprimée',
-  );
-}
-
     // Vérification du changement de statut
     if (dto.statut !== undefined) {
-      this.verifierTransitionStatut(
-        culture.statut,
-        dto.statut,
-      );
+      this.verifierTransitionStatut(culture.statut, dto.statut);
     }
 
     // Calcul des dates finales
@@ -324,16 +289,12 @@ if (
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Empêcher une deuxième suppression
     if (culture.statut === StatutCulture.SUPPRIMEE) {
-      throw new BadRequestException(
-        'Cette culture est déjà supprimée',
-      );
+      throw new BadRequestException('Cette culture est déjà supprimée');
     }
 
     return this.prisma.culture.update({
@@ -347,7 +308,7 @@ if (
       },
     });
   }
-    // =========================
+  // =========================
   // RÉCUPÉRER LES POINTS GPS
   // D'UNE CULTURE
   // =========================
@@ -367,9 +328,7 @@ if (
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     return this.prisma.pointGPSCulture.findMany({
@@ -382,78 +341,70 @@ if (
     });
   }
 
- // =========================
-// ENREGISTRER LES POINTS GPS
-// D'UNE CULTURE
-// =========================
-async savePointsGPS(
-  parcelleId: string,
-  cultureId: string,
-  utilisateurId: string,
-  points: {
-    latitude: number;
-    longitude: number;
-    ordre: number;
-  }[],
-) {
-  const culture = await this.prisma.culture.findFirst({
-    where: {
-      id: cultureId,
-      parcelleId,
-      parcelle: {
-        utilisateurId,
-      },
-    },
-  });
-
-  if (!culture) {
-    throw new NotFoundException(
-      'Culture introuvable',
-    );
-  }
-
-  // Une culture récoltée ou supprimée ne peut plus être tracée
-  if (
-    culture.statut === StatutCulture.RECOLTEE ||
-    culture.statut === StatutCulture.SUPPRIMEE
+  // =========================
+  // ENREGISTRER LES POINTS GPS
+  // D'UNE CULTURE
+  // =========================
+  async savePointsGPS(
+    parcelleId: string,
+    cultureId: string,
+    utilisateurId: string,
+    points: {
+      latitude: number;
+      longitude: number;
+      ordre: number;
+    }[],
   ) {
-    throw new BadRequestException(
-      'Impossible de modifier le tracé d’une culture récoltée ou supprimée',
-    );
-  }
+    const culture = await this.prisma.culture.findFirst({
+      where: {
+        id: cultureId,
+        parcelleId,
+        parcelle: {
+          utilisateurId,
+        },
+      },
+    });
 
-  
-  // Au minimum 3 points pour former une zone
-  if (points.length < 3) {
-    throw new BadRequestException(
-      'Une culture doit avoir au moins 3 points GPS',
-    );
-  }
+    if (!culture) {
+      throw new NotFoundException('Culture introuvable');
+    }
 
-  
-  // =====================================================
-  // RÉCUPÉRER UNIQUEMENT LES CULTURES QUI OCCUPENT
-  // ACTUELLEMENT UNE ZONE
-  //
-  // RECOLTEE   => disponible
-  // ABANDONNEE => disponible
-  // SUPPRIMEE  => disponible
-  //
-  // PLANIFIEE + EN_COURS => zone occupée
-  // =====================================================
+    // Une culture récoltée ou supprimée ne peut plus être tracée
+    if (
+      culture.statut === StatutCulture.RECOLTEE ||
+      culture.statut === StatutCulture.SUPPRIMEE
+    ) {
+      throw new BadRequestException(
+        'Impossible de modifier le tracé d’une culture récoltée ou supprimée',
+      );
+    }
 
-  const culturesActives =
-    await this.prisma.culture.findMany({
+    // Au minimum 3 points pour former une zone
+    if (points.length < 3) {
+      throw new BadRequestException(
+        'Une culture doit avoir au moins 3 points GPS',
+      );
+    }
+
+    // =====================================================
+    // RÉCUPÉRER UNIQUEMENT LES CULTURES QUI OCCUPENT
+    // ACTUELLEMENT UNE ZONE
+    //
+    // RECOLTEE   => disponible
+    // ABANDONNEE => disponible
+    // SUPPRIMEE  => disponible
+    //
+    // PLANIFIEE + EN_COURS => zone occupée
+    // =====================================================
+
+    const culturesActives = await this.prisma.culture.findMany({
       where: {
         parcelleId,
 
         // Ne prendre que les cultures qui occupent
         // actuellement une partie de la parcelle
         statut: {
-          in: [
-            StatutCulture.PLANIFIEE,
-            StatutCulture.EN_COURS,
-          ],
+          in: [StatutCulture.PLANIFIEE, StatutCulture.EN_COURS],
         },
 
         // Ne pas comparer la culture avec elle-même
@@ -470,103 +421,90 @@ async savePointsGPS(
         },
       },
     });
-console.log(
-  'CULTURES ACTIVES:',
-  culturesActives,
-);
 
-// Vérifie si un point est à l'intérieur d'un polygone
-const pointDansPolygone = (
-  latitude: number,
-  longitude: number,
-  polygone: {
-    latitude: number;
-    longitude: number;
-  }[],
-): boolean => {
-  let dedans = false;
+    console.log('CULTURES ACTIVES:', culturesActives);
 
-  for (
-    let i = 0, j = polygone.length - 1;
-    i < polygone.length;
-    j = i++
-  ) {
-    const xi = polygone[i].longitude;
-    const yi = polygone[i].latitude;
+    // Vérifie si un point est à l'intérieur d'un polygone
+    const pointDansPolygone = (
+      latitude: number,
+      longitude: number,
+      polygone: {
+        latitude: number;
+        longitude: number;
+      }[],
+    ): boolean => {
+      let dedans = false;
 
-    const xj = polygone[j].longitude;
-    const yj = polygone[j].latitude;
+      for (let i = 0, j = polygone.length - 1; i < polygone.length; j = i++) {
+        const xi = polygone[i].longitude;
+        const yi = polygone[i].latitude;
 
-    const intersecte =
-      yi > latitude !== yj > latitude &&
-      longitude <
-        ((xj - xi) * (latitude - yi)) /
-          (yj - yi) +
-          xi;
+        const xj = polygone[j].longitude;
+        const yj = polygone[j].latitude;
 
-    if (intersecte) {
-      dedans = !dedans;
+        const intersecte =
+          yi > latitude !== yj > latitude &&
+          longitude < ((xj - xi) * (latitude - yi)) / (yj - yi) + xi;
+
+        if (intersecte) {
+          dedans = !dedans;
+        }
+      }
+
+      return dedans;
+    };
+
+    // Vérifier si la nouvelle zone entre dans une zone active
+    for (const cultureActive of culturesActives) {
+      const zoneActive = cultureActive.pointsGPS;
+
+      if (zoneActive.length < 3) {
+        continue;
+      }
+
+      const chevauchement = points.some((point) =>
+        pointDansPolygone(point.latitude, point.longitude, zoneActive),
+      );
+
+      if (chevauchement) {
+        throw new BadRequestException(
+          `La zone de la culture "${cultureActive.nom}" chevauche la zone d'une culture ${cultureActive.statut}.`,
+        );
+      }
     }
+    // =====================================================
+    // POUR L'INSTANT :
+    // on prépare les zones actives.
+    //
+    // Les cultures RECOLTEE ne sont PAS récupérées ici,
+    // donc leurs anciennes zones GPS ne bloquent plus
+    // une nouvelle culture.
+    // =====================================================
+
+    // Supprimer l'ancien tracé
+    await this.prisma.pointGPSCulture.deleteMany({
+      where: {
+        cultureId,
+      },
+    });
+
+    // Enregistrer le nouveau tracé
+    await this.prisma.pointGPSCulture.createMany({
+      data: points.map((point) => ({
+        latitude: point.latitude,
+        longitude: point.longitude,
+        ordre: point.ordre,
+        cultureId,
+      })),
+    });
+
+    return this.prisma.pointGPSCulture.findMany({
+      where: {
+        cultureId,
+      },
+      orderBy: {
+        ordre: 'asc',
+      },
+    });
   }
-
-  return dedans;
-};
-
-// Vérifier si la nouvelle zone entre dans une zone active
-for (const cultureActive of culturesActives) {
-  const zoneActive = cultureActive.pointsGPS;
-
-  if (zoneActive.length < 3) {
-    continue;
-  }
-
-  const chevauchement = points.some((point) =>
-    pointDansPolygone(
-      point.latitude,
-      point.longitude,
-      zoneActive,
-    ),
-  );
-
-  if (chevauchement) {
-    throw new BadRequestException(
-      `La zone de la culture "${cultureActive.nom}" chevauche la zone d'une culture ${cultureActive.statut}.`,
-    );
-  }
-}
-  // =====================================================
-  // POUR L'INSTANT :
-  // on prépare les zones actives.
-  //
-  // Les cultures RECOLTEE ne sont PAS récupérées ici,
-  // donc leurs anciennes zones GPS ne bloquent plus
-  // une nouvelle culture.
-  // =====================================================
-
-  // Supprimer l'ancien tracé
-  await this.prisma.pointGPSCulture.deleteMany({
-    where: {
-      cultureId,
-    },
-  });
-
-  // Enregistrer le nouveau tracé
-  await this.prisma.pointGPSCulture.createMany({
-    data: points.map((point) => ({
-      latitude: point.latitude,
-      longitude: point.longitude,
-      ordre: point.ordre,
-      cultureId,
-    })),
-  });
-
-  return this.prisma.pointGPSCulture.findMany({
-    where: {
-      cultureId,
-    },
-    orderBy: {
-      ordre: 'asc',
-    },
-  });
-}
 }

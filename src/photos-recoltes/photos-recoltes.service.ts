@@ -11,49 +11,35 @@ import { UpdatePhotoRecolteDto } from './dto/modification-photo-recolte.dto';
 
 @Injectable()
 export class PhotosRecoltesService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // =========================
   // VÉRIFIER LA RÉCOLTE
   // =========================
-  private async verifierRecolte(
-    recolteId: string,
-    utilisateurId: string,
-  ) {
-    const recolte =
-      await this.prisma.recolte.findFirst({
-        where: {
-          id: recolteId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+  private async verifierRecolte(recolteId: string, utilisateurId: string) {
+    const recolte = await this.prisma.recolte.findFirst({
+      where: {
+        id: recolteId,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-        include: {
-          culture: true,
-        },
-      });
+      },
+      include: {
+        culture: true,
+      },
+    });
 
     if (!recolte) {
-      throw new NotFoundException(
-        'Récolte introuvable',
-      );
+      throw new NotFoundException('Récolte introuvable');
     }
 
-    if (
-      recolte.culture.statut === 'SUPPRIMEE'
-    ) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+    if (recolte.culture.statut === 'SUPPRIMEE') {
+      throw new NotFoundException('Culture introuvable');
     }
 
-    if (
-      recolte.culture.statut !== 'RECOLTEE'
-    ) {
+    if (recolte.culture.statut !== 'RECOLTEE') {
       throw new BadRequestException(
         'La culture doit être récoltée pour gérer les photos de récolte',
       );
@@ -70,10 +56,7 @@ export class PhotosRecoltesService {
     dto: CreatePhotoRecolteDto,
     utilisateurId: string,
   ) {
-    await this.verifierRecolte(
-      recolteId,
-      utilisateurId,
-    );
+    await this.verifierRecolte(recolteId, utilisateurId);
 
     return this.prisma.photoRecolte.create({
       data: {
@@ -86,15 +69,8 @@ export class PhotosRecoltesService {
   // =========================
   // UPLOADER UNE PHOTO
   // =========================
-  async upload(
-    recolteId: string,
-    utilisateurId: string,
-    url: string,
-  ) {
-    await this.verifierRecolte(
-      recolteId,
-      utilisateurId,
-    );
+  async upload(recolteId: string, utilisateurId: string, url: string) {
+    await this.verifierRecolte(recolteId, utilisateurId);
 
     return this.prisma.photoRecolte.create({
       data: {
@@ -107,14 +83,8 @@ export class PhotosRecoltesService {
   // =========================
   // RÉCUPÉRER LES PHOTOS
   // =========================
-  async findAll(
-    recolteId: string,
-    utilisateurId: string,
-  ) {
-    await this.verifierRecolte(
-      recolteId,
-      utilisateurId,
-    );
+  async findAll(recolteId: string, utilisateurId: string) {
+    await this.verifierRecolte(recolteId, utilisateurId);
 
     return this.prisma.photoRecolte.findMany({
       where: {
@@ -129,28 +99,18 @@ export class PhotosRecoltesService {
   // =========================
   // RÉCUPÉRER UNE PHOTO
   // =========================
-  async findOne(
-    recolteId: string,
-    id: string,
-    utilisateurId: string,
-  ) {
-    await this.verifierRecolte(
-      recolteId,
-      utilisateurId,
-    );
+  async findOne(recolteId: string, id: string, utilisateurId: string) {
+    await this.verifierRecolte(recolteId, utilisateurId);
 
-    const photo =
-      await this.prisma.photoRecolte.findFirst({
-        where: {
-          id,
-          recolteId,
-        },
-      });
+    const photo = await this.prisma.photoRecolte.findFirst({
+      where: {
+        id,
+        recolteId,
+      },
+    });
 
     if (!photo) {
-      throw new NotFoundException(
-        'Photo de récolte introuvable',
-      );
+      throw new NotFoundException('Photo de récolte introuvable');
     }
 
     return photo;
@@ -165,16 +125,9 @@ export class PhotosRecoltesService {
     dto: UpdatePhotoRecolteDto,
     utilisateurId: string,
   ) {
-    await this.verifierRecolte(
-      recolteId,
-      utilisateurId,
-    );
+    await this.verifierRecolte(recolteId, utilisateurId);
 
-    await this.findOne(
-      recolteId,
-      id,
-      utilisateurId,
-    );
+    await this.findOne(recolteId, id, utilisateurId);
 
     return this.prisma.photoRecolte.update({
       where: {
@@ -191,21 +144,10 @@ export class PhotosRecoltesService {
   // =========================
   // SUPPRIMER UNE PHOTO
   // =========================
-  async remove(
-    recolteId: string,
-    id: string,
-    utilisateurId: string,
-  ) {
-    await this.verifierRecolte(
-      recolteId,
-      utilisateurId,
-    );
+  async remove(recolteId: string, id: string, utilisateurId: string) {
+    await this.verifierRecolte(recolteId, utilisateurId);
 
-    await this.findOne(
-      recolteId,
-      id,
-      utilisateurId,
-    );
+    await this.findOne(recolteId, id, utilisateurId);
 
     return this.prisma.photoRecolte.delete({
       where: {

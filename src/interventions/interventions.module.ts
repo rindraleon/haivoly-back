@@ -6,14 +6,8 @@ import { InterventionsService } from './interventions.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-  ],
-  controllers: [
-    InterventionsController,
-  ],
-  providers: [
-    InterventionsService,
-  ],
+  imports: [PrismaModule],
+  controllers: [InterventionsController],
+  providers: [InterventionsService],
 })
 export class InterventionsModule {}

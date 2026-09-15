@@ -12,13 +12,8 @@ import { PrismaService } from '../prisma/prisma.service';
     PhotosInterventionsUploadController,
   ],
 
-  providers: [
-    PhotosInterventionsService,
-    PrismaService,
-  ],
+  providers: [PhotosInterventionsService, PrismaService],
 
-  exports: [
-    PhotosInterventionsService,
-  ],
+  exports: [PhotosInterventionsService],
 })
 export class PhotosInterventionsModule {}

@@ -1,10 +1,5 @@
-import {
-  Body,
-  Controller,
-  Post,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
+import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 
 import { SyncService } from './sync.service';
 import { SyncDto } from './dto/sync.dto';
@@ -16,13 +11,7 @@ export class SyncController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async synchronize(
-    @Req() req: any,
-    @Body() dto: SyncDto,
-  ) {
-    return this.syncService.synchronize(
-  req.user.id,
-  dto,
-);
+  async synchronize(@Req() req: any, @Body() dto: SyncDto) {
+    return this.syncService.synchronize(req.user.id, dto);
   }
 }

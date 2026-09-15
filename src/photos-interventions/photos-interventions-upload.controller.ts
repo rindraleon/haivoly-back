@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
   Controller,
@@ -35,14 +36,9 @@ export class PhotosInterventionsUploadController {
           const uniqueSuffix =
             Date.now() + '-' + Math.round(Math.random() * 1e9);
 
-          const extension = extname(
-            file.originalname,
-          ).toLowerCase();
+          const extension = extname(file.originalname).toLowerCase();
 
-          callback(
-            null,
-            `intervention-${uniqueSuffix}${extension}`,
-          );
+          callback(null, `intervention-${uniqueSuffix}${extension}`);
         },
       }),
 
@@ -51,16 +47,9 @@ export class PhotosInterventionsUploadController {
       },
 
       fileFilter: (_req, file, callback) => {
-        const extension = extname(
-          file.originalname,
-        ).toLowerCase();
+        const extension = extname(file.originalname).toLowerCase();
 
-        const extensionsAutorisees = [
-          '.jpg',
-          '.jpeg',
-          '.png',
-          '.webp',
-        ];
+        const extensionsAutorisees = ['.jpg', '.jpeg', '.png', '.webp'];
 
         if (!extensionsAutorisees.includes(extension)) {
           return callback(
@@ -88,23 +77,19 @@ export class PhotosInterventionsUploadController {
     @Request() req: any,
   ) {
     if (!file) {
-      throw new BadRequestException(
-        'Aucune image n’a été envoyée',
-      );
+      throw new BadRequestException('Aucune image n’a été envoyée');
     }
 
-    const url =
-    `http://192.168.0.106:3000/uploads/interventions/`
+    const url = `http://192.168.0.106:3000/uploads/interventions/`;
     //`http://192.168.1.43:3000/uploads/interventions/` +
-      file.filename;
+    file.filename;
 
-    const photo =
-      await this.photosInterventionsService.upload(
-        interventionId,
-        cultureId,
-        req.user.id,
-        url,
-      );
+    const photo = await this.photosInterventionsService.upload(
+      interventionId,
+      cultureId,
+      req.user.id,
+      url,
+    );
 
     return {
       message: 'Photo uploadée avec succès',

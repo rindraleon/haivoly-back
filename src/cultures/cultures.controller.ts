@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -20,9 +21,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller('parcelles/:parcelleId/cultures')
 @UseGuards(JwtAuthGuard)
 export class CulturesController {
-  constructor(
-    private readonly culturesService: CulturesService,
-  ) {}
+  constructor(private readonly culturesService: CulturesService) {}
 
   // =========================
   // CRÉER UNE CULTURE
@@ -33,11 +32,7 @@ export class CulturesController {
     @Body() dto: CreateCultureDto,
     @Request() req: any,
   ) {
-    return this.culturesService.create(
-      parcelleId,
-      dto,
-      req.user.id,
-    );
+    return this.culturesService.create(parcelleId, dto, req.user.id);
   }
 
   // =========================
@@ -45,17 +40,11 @@ export class CulturesController {
   // D'UNE PARCELLE
   // =========================
   @Get()
-  findAll(
-    @Param('parcelleId') parcelleId: string,
-    @Request() req: any,
-  ) {
-    return this.culturesService.findAll(
-      parcelleId,
-      req.user.id,
-    );
+  findAll(@Param('parcelleId') parcelleId: string, @Request() req: any) {
+    return this.culturesService.findAll(parcelleId, req.user.id);
   }
 
-    // =========================
+  // =========================
   // RÉCUPÉRER LES POINTS GPS D'UNE CULTURE
   // =========================
 
@@ -65,11 +54,7 @@ export class CulturesController {
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    return this.culturesService.findPointsGPS(
-      parcelleId,
-      id,
-      req.user.id,
-    );
+    return this.culturesService.findPointsGPS(parcelleId, id, req.user.id);
   }
 
   // =========================
@@ -100,11 +85,7 @@ export class CulturesController {
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    return this.culturesService.findOne(
-      parcelleId,
-      id,
-      req.user.id,
-    );
+    return this.culturesService.findOne(parcelleId, id, req.user.id);
   }
 
   // =========================
@@ -117,12 +98,7 @@ export class CulturesController {
     @Body() dto: UpdateCultureDto,
     @Request() req: any,
   ) {
-    return this.culturesService.update(
-      parcelleId,
-      id,
-      dto,
-      req.user.id,
-    );
+    return this.culturesService.update(parcelleId, id, dto, req.user.id);
   }
 
   // =========================

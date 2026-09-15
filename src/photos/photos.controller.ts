@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -22,9 +23,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 )
 @UseGuards(JwtAuthGuard)
 export class PhotosController {
-  constructor(
-    private readonly photosService: PhotosService,
-  ) {}
+  constructor(private readonly photosService: PhotosService) {}
 
   // =========================
   // AJOUTER UNE PHOTO
@@ -53,11 +52,7 @@ export class PhotosController {
     @Param('observationId') observationId: string,
     @Request() req: any,
   ) {
-    return this.photosService.findAll(
-      observationId,
-      cultureId,
-      req.user.id,
-    );
+    return this.photosService.findAll(observationId, cultureId, req.user.id);
   }
 
   // =========================
@@ -108,11 +103,6 @@ export class PhotosController {
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    return this.photosService.remove(
-      observationId,
-      cultureId,
-      id,
-      req.user.id,
-    );
+    return this.photosService.remove(observationId, cultureId, id, req.user.id);
   }
 }

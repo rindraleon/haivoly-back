@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -17,14 +18,10 @@ import { UpdateInterventionDto } from './dto/modification-intervention.dto';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller(
-  'parcelles/:parcelleId/cultures/:cultureId/interventions',
-)
+@Controller('parcelles/:parcelleId/cultures/:cultureId/interventions')
 @UseGuards(JwtAuthGuard)
 export class InterventionsController {
-  constructor(
-    private readonly interventionsService: InterventionsService,
-  ) {}
+  constructor(private readonly interventionsService: InterventionsService) {}
 
   // =========================
   // CRÉER
@@ -35,25 +32,15 @@ export class InterventionsController {
     @Body() dto: CreateInterventionDto,
     @Request() req: any,
   ) {
-    return this.interventionsService.create(
-      cultureId,
-      dto,
-      req.user.id,
-    );
+    return this.interventionsService.create(cultureId, dto, req.user.id);
   }
 
   // =========================
   // LISTE
   // =========================
   @Get()
-  findAll(
-    @Param('cultureId') cultureId: string,
-    @Request() req: any,
-  ) {
-    return this.interventionsService.findAll(
-      cultureId,
-      req.user.id,
-    );
+  findAll(@Param('cultureId') cultureId: string, @Request() req: any) {
+    return this.interventionsService.findAll(cultureId, req.user.id);
   }
 
   // =========================
@@ -65,11 +52,7 @@ export class InterventionsController {
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    return this.interventionsService.findOne(
-      cultureId,
-      id,
-      req.user.id,
-    );
+    return this.interventionsService.findOne(cultureId, id, req.user.id);
   }
 
   // =========================
@@ -82,12 +65,7 @@ export class InterventionsController {
     @Body() dto: UpdateInterventionDto,
     @Request() req: any,
   ) {
-    return this.interventionsService.update(
-      cultureId,
-      id,
-      dto,
-      req.user.id,
-    );
+    return this.interventionsService.update(cultureId, id, dto, req.user.id);
   }
 
   // =========================
@@ -99,10 +77,6 @@ export class InterventionsController {
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    return this.interventionsService.remove(
-      cultureId,
-      id,
-      req.user.id,
-    );
+    return this.interventionsService.remove(cultureId, id, req.user.id);
   }
 }

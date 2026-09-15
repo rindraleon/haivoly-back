@@ -6,20 +6,12 @@ import { PhotosRecoltesController } from './photos-recoltes.controller';
 import { PhotosRecoltesService } from './photos-recoltes.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-  ],
+  imports: [PrismaModule],
 
-  controllers: [
-    PhotosRecoltesController,
-  ],
+  controllers: [PhotosRecoltesController],
 
-  providers: [
-    PhotosRecoltesService,
-  ],
+  providers: [PhotosRecoltesService],
 
-  exports: [
-    PhotosRecoltesService,
-  ],
+  exports: [PhotosRecoltesService],
 })
 export class PhotosRecoltesModule {}

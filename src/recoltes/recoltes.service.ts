@@ -12,9 +12,7 @@ import { UpdateRecolteDto } from './dto/modification-recolte.dto';
 
 @Injectable()
 export class RecoltesService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // =========================
   // CRÉER UNE RÉCOLTE
@@ -35,9 +33,7 @@ export class RecoltesService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Seule une culture EN_COURS peut être récoltée
@@ -48,32 +44,24 @@ export class RecoltesService {
     }
 
     // Une seule récolte par culture
-    const recolteExistante =
-      await this.prisma.recolte.findUnique({
-        where: {
-          cultureId,
-        },
-      });
+    const recolteExistante = await this.prisma.recolte.findUnique({
+      where: {
+        cultureId,
+      },
+    });
 
     if (recolteExistante) {
-      throw new BadRequestException(
-        'Cette culture possède déjà une récolte',
-      );
+      throw new BadRequestException('Cette culture possède déjà une récolte');
     }
 
     // Vérifier la date de récolte
     const dateRecolte = new Date(dto.dateRecolte);
 
     if (isNaN(dateRecolte.getTime())) {
-      throw new BadRequestException(
-        'Date de récolte invalide',
-      );
+      throw new BadRequestException('Date de récolte invalide');
     }
 
-    if (
-      culture.datePlantation &&
-      dateRecolte < culture.datePlantation
-    ) {
+    if (culture.datePlantation && dateRecolte < culture.datePlantation) {
       throw new BadRequestException(
         'La date de récolte ne peut pas être avant la date de plantation',
       );
@@ -109,10 +97,7 @@ export class RecoltesService {
   // =========================
   // RÉCUPÉRER LA RÉCOLTE
   // =========================
-  async findOne(
-    cultureId: string,
-    utilisateurId: string,
-  ) {
+  async findOne(cultureId: string, utilisateurId: string) {
     const culture = await this.prisma.culture.findFirst({
       where: {
         id: cultureId,
@@ -123,31 +108,26 @@ export class RecoltesService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Une culture supprimée ne doit pas être consultable
     if (culture.statut === StatutCulture.SUPPRIMEE) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
-    const recolte =
-      await this.prisma.recolte.findUnique({
-        where: {
-          cultureId,
-        },
-        include: {
-          photos: {
-            orderBy: {
-              dateAjout: 'desc',
-            },
+    const recolte = await this.prisma.recolte.findUnique({
+      where: {
+        cultureId,
+      },
+      include: {
+        photos: {
+          orderBy: {
+            dateAjout: 'desc',
           },
         },
-      });
+      },
+    });
 
     if (!recolte) {
       throw new NotFoundException(
@@ -161,30 +141,23 @@ export class RecoltesService {
   // =========================
   // MODIFIER UNE RÉCOLTE
   // =========================
-  async update(
-    id: string,
-    dto: UpdateRecolteDto,
-    utilisateurId: string,
-  ) {
-    const recolte =
-      await this.prisma.recolte.findFirst({
-        where: {
-          id,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+  async update(id: string, dto: UpdateRecolteDto, utilisateurId: string) {
+    const recolte = await this.prisma.recolte.findFirst({
+      where: {
+        id,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-        include: {
-          culture: true,
-        },
-      });
+      },
+      include: {
+        culture: true,
+      },
+    });
 
     if (!recolte) {
-      throw new NotFoundException(
-        'Récolte introuvable',
-      );
+      throw new NotFoundException('Récolte introuvable');
     }
 
     // Une récolte appartenant à une culture récoltée
@@ -197,26 +170,20 @@ export class RecoltesService {
   // =========================
   // SUPPRIMER UNE RÉCOLTE
   // =========================
-  async remove(
-    id: string,
-    utilisateurId: string,
-  ) {
-    const recolte =
-      await this.prisma.recolte.findFirst({
-        where: {
-          id,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+  async remove(id: string, utilisateurId: string) {
+    const recolte = await this.prisma.recolte.findFirst({
+      where: {
+        id,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-      });
+      },
+    });
 
     if (!recolte) {
-      throw new NotFoundException(
-        'Récolte introuvable',
-      );
+      throw new NotFoundException('Récolte introuvable');
     }
 
     // La récolte fait partie de l'historique de la culture
@@ -228,36 +195,26 @@ export class RecoltesService {
   // =========================
   // AJOUTER UNE PHOTO
   // =========================
-  async uploadPhoto(
-    recolteId: string,
-    utilisateurId: string,
-    url: string,
-  ) {
-    const recolte =
-      await this.prisma.recolte.findFirst({
-        where: {
-          id: recolteId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+  async uploadPhoto(recolteId: string, utilisateurId: string, url: string) {
+    const recolte = await this.prisma.recolte.findFirst({
+      where: {
+        id: recolteId,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-        include: {
-          culture: true,
-        },
-      });
+      },
+      include: {
+        culture: true,
+      },
+    });
 
     if (!recolte) {
-      throw new NotFoundException(
-        'Récolte introuvable',
-      );
+      throw new NotFoundException('Récolte introuvable');
     }
 
-    if (
-      recolte.culture.statut !==
-      StatutCulture.RECOLTEE
-    ) {
+    if (recolte.culture.statut !== StatutCulture.RECOLTEE) {
       throw new BadRequestException(
         'La culture doit être récoltée pour ajouter une photo',
       );
@@ -273,29 +230,29 @@ export class RecoltesService {
   }
 
   async findAll(utilisateurId: string) {
-  return this.prisma.recolte.findMany({
-    where: {
-      culture: {
-        parcelle: {
-          utilisateurId,
+    return this.prisma.recolte.findMany({
+      where: {
+        culture: {
+          parcelle: {
+            utilisateurId,
+          },
         },
       },
-    },
-    include: {
-      culture: {
-        include: {
-          parcelle: true,
+      include: {
+        culture: {
+          include: {
+            parcelle: true,
+          },
+        },
+        photos: {
+          orderBy: {
+            dateAjout: 'desc',
+          },
         },
       },
-      photos: {
-        orderBy: {
-          dateAjout: 'desc',
-        },
+      orderBy: {
+        dateRecolte: 'desc',
       },
-    },
-    orderBy: {
-      dateRecolte: 'desc',
-    },
-  });
-}
+    });
+  }
 }

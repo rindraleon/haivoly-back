@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -18,9 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class RecoltesController {
-  constructor(
-    private readonly recoltesService: RecoltesService,
-  ) {}
+  constructor(private readonly recoltesService: RecoltesService) {}
 
   // =========================
   // LISTE DE TOUTES LES RÉCOLTES
@@ -41,11 +40,7 @@ export class RecoltesController {
     @Body() dto: CreateRecolteDto,
     @Request() req: any,
   ) {
-    return this.recoltesService.create(
-      cultureId,
-      dto,
-      req.user.id,
-    );
+    return this.recoltesService.create(cultureId, dto, req.user.id);
   }
 
   // =========================
@@ -53,14 +48,8 @@ export class RecoltesController {
   // =========================
 
   @Get('cultures/:cultureId/recolte')
-  async findOne(
-    @Param('cultureId') cultureId: string,
-    @Request() req: any,
-  ) {
-    return this.recoltesService.findOne(
-      cultureId,
-      req.user.id,
-    );
+  async findOne(@Param('cultureId') cultureId: string, @Request() req: any) {
+    return this.recoltesService.findOne(cultureId, req.user.id);
   }
 
   // =========================
@@ -73,11 +62,7 @@ export class RecoltesController {
     @Body() dto: UpdateRecolteDto,
     @Request() req: any,
   ) {
-    return this.recoltesService.update(
-      id,
-      dto,
-      req.user.id,
-    );
+    return this.recoltesService.update(id, dto, req.user.id);
   }
 
   // =========================
@@ -85,13 +70,7 @@ export class RecoltesController {
   // =========================
 
   @Delete('recoltes/:id')
-  async remove(
-    @Param('id') id: string,
-    @Request() req: any,
-  ) {
-    return this.recoltesService.remove(
-      id,
-      req.user.id,
-    );
+  async remove(@Param('id') id: string, @Request() req: any) {
+    return this.recoltesService.remove(id, req.user.id);
   }
 }

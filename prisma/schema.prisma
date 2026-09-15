@@ -17,6 +17,70 @@ model Utilisateur {
   modifieA  DateTime   @updatedAt
   role      Role       @default(AGRICULTEUR)
   parcelles Parcelle[]
+  passwordResetTokens PasswordResetToken[]
+  actions   Action[]
+  recommendations Recommendation[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  utilisateurId String?
+  utilisateur   Utilisateur? @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([expiresAt])
+}
+
+model Action {
+  id         String   @id @default(uuid())
+  // idempotence : clientId unique par device, évite doublon si retry
+  clientId   String?  @unique
+  userId     String
+  utilisateur Utilisateur @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actionType String
+  entityType String
+  entityId   String?
+  payload    Json?
+  timestamp  DateTime @default(now())
+  deviceId   String?
+  syncStatus String   @default("SYNCED") // PENDING, SYNCING, SYNCED, FAILED, DUPLICATE
+  retryCount Int      @default(0)
+  syncedAt   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  metadata   Json?
+
+  @@index([userId])
+  @@index([actionType])
+  @@index([entityType])
+  @@index([syncStatus])
+  @@index([createdAt])
+  @@index([timestamp])
+}
+
+model Recommendation {
+  id        String   @id @default(uuid())
+  userId    String
+  utilisateur Utilisateur @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // INFO, WARNING, SUCCESS, ALERT
+  priority  String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  readAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  metadata  Json?
+
+  @@index([userId])
+  @@index([type])
+  @@index([priority])
+  @@index([createdAt])
 }
 
 enum Role {
@@ -178,15 +242,16 @@ model Recolte {
   modifieA    DateTime @updatedAt
 
   cultureId String   @unique
-  culture   Culture  @relation( fields: [cultureId], references: [id], onDelete: Cascade)
+  culture   Culture  @relation(fields: [cultureId], references: [id], onDelete: Cascade)
 
   photos PhotoRecolte[]
 }
+
 model PhotoRecolte {
   id        String   @id @default(uuid())
   url       String
   dateAjout DateTime @default(now())
   recolteId String
 
-  recolte   Recolte  @relation( fields: [recolteId], references: [id], onDelete: Cascade)
+  recolte Recolte @relation(fields: [recolteId], references: [id], onDelete: Cascade)
 }

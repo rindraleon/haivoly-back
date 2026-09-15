@@ -8,10 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [
-    PhotosController,
-    PhotosUploadController,
-  ],
+  controllers: [PhotosController, PhotosUploadController],
   providers: [PhotosService],
 })
 export class PhotosModule {}

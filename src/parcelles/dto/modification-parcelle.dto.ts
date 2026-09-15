@@ -9,9 +9,7 @@ export enum StatutParcelleDto {
   ARCHIVEE = 'ARCHIVEE',
 }
 
-export class UpdateParcelleDto extends PartialType(
-  CreateParcelleDto,
-) {
+export class UpdateParcelleDto extends PartialType(CreateParcelleDto) {
   @IsOptional()
   @IsEnum(StatutParcelleDto)
   statut?: StatutParcelleDto;

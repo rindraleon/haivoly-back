@@ -10,9 +10,7 @@ import { UpdateObservationDto } from './dto/modification-observation.dto';
 
 @Injectable()
 export class ObservationsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // =========================
   // VÉRIFIER LA CULTURE
@@ -33,15 +31,11 @@ export class ObservationsService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException(
-        'Cette culture est supprimée',
-      );
+      throw new NotFoundException('Cette culture est supprimée');
     }
 
     return culture;
@@ -62,10 +56,7 @@ export class ObservationsService {
       utilisateurId,
     );
 
-    if (
-      culture.statut === 'RECOLTEE' ||
-      culture.statut === 'ABANDONNEE'
-    ) {
+    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
       throw new ForbiddenException(
         'Impossible de créer une observation pour cette culture',
       );
@@ -75,9 +66,7 @@ export class ObservationsService {
       data: {
         description: dto.description,
 
-        date: dto.date
-          ? new Date(dto.date)
-          : undefined,
+        date: dto.date ? new Date(dto.date) : undefined,
 
         cultureId,
       },
@@ -87,16 +76,8 @@ export class ObservationsService {
   // =========================
   // RÉCUPÉRER LES OBSERVATIONS
   // =========================
-  async findAll(
-    parcelleId: string,
-    cultureId: string,
-    utilisateurId: string,
-  ) {
-    await this.verifierCulture(
-      parcelleId,
-      cultureId,
-      utilisateurId,
-    );
+  async findAll(parcelleId: string, cultureId: string, utilisateurId: string) {
+    await this.verifierCulture(parcelleId, cultureId, utilisateurId);
 
     return this.prisma.observation.findMany({
       where: {
@@ -120,27 +101,20 @@ export class ObservationsService {
     id: string,
     utilisateurId: string,
   ) {
-    await this.verifierCulture(
-      parcelleId,
-      cultureId,
-      utilisateurId,
-    );
+    await this.verifierCulture(parcelleId, cultureId, utilisateurId);
 
-    const observation =
-      await this.prisma.observation.findFirst({
-        where: {
-          id,
-          cultureId,
-        },
-        include: {
-          photos: true,
-        },
-      });
+    const observation = await this.prisma.observation.findFirst({
+      where: {
+        id,
+        cultureId,
+      },
+      include: {
+        photos: true,
+      },
+    });
 
     if (!observation) {
-      throw new NotFoundException(
-        'Observation introuvable',
-      );
+      throw new NotFoundException('Observation introuvable');
     }
 
     return observation;
@@ -162,27 +136,21 @@ export class ObservationsService {
       utilisateurId,
     );
 
-    if (
-      culture.statut === 'RECOLTEE' ||
-      culture.statut === 'ABANDONNEE'
-    ) {
+    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
       throw new ForbiddenException(
         'Impossible de modifier une observation pour cette culture',
       );
     }
 
-    const observation =
-      await this.prisma.observation.findFirst({
-        where: {
-          id,
-          cultureId,
-        },
-      });
+    const observation = await this.prisma.observation.findFirst({
+      where: {
+        id,
+        cultureId,
+      },
+    });
 
     if (!observation) {
-      throw new NotFoundException(
-        'Observation introuvable',
-      );
+      throw new NotFoundException('Observation introuvable');
     }
 
     return this.prisma.observation.update({
@@ -219,27 +187,21 @@ export class ObservationsService {
       utilisateurId,
     );
 
-    if (
-      culture.statut === 'RECOLTEE' ||
-      culture.statut === 'ABANDONNEE'
-    ) {
+    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
       throw new ForbiddenException(
         'Impossible de supprimer une observation pour cette culture',
       );
     }
 
-    const observation =
-      await this.prisma.observation.findFirst({
-        where: {
-          id,
-          cultureId,
-        },
-      });
+    const observation = await this.prisma.observation.findFirst({
+      where: {
+        id,
+        cultureId,
+      },
+    });
 
     if (!observation) {
-      throw new NotFoundException(
-        'Observation introuvable',
-      );
+      throw new NotFoundException('Observation introuvable');
     }
 
     return this.prisma.observation.delete({

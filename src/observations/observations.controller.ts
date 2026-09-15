@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -16,14 +17,10 @@ import { UpdateObservationDto } from './dto/modification-observation.dto';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller(
-  'parcelles/:parcelleId/cultures/:cultureId/observations',
-)
+@Controller('parcelles/:parcelleId/cultures/:cultureId/observations')
 @UseGuards(JwtAuthGuard)
 export class ObservationsController {
-  constructor(
-    private readonly observationsService: ObservationsService,
-  ) {}
+  constructor(private readonly observationsService: ObservationsService) {}
 
   @Post()
   create(
@@ -46,11 +43,7 @@ export class ObservationsController {
     @Param('cultureId') cultureId: string,
     @Request() req: any,
   ) {
-    return this.observationsService.findAll(
-      parcelleId,
-      cultureId,
-      req.user.id,
-    );
+    return this.observationsService.findAll(parcelleId, cultureId, req.user.id);
   }
 
   @Get(':id')

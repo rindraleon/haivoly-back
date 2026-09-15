@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
 import {
   BadRequestException,
   Controller,
@@ -19,14 +20,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 import { PhotosRecoltesService } from './photos-recoltes.service';
 
-@Controller(
-  'recoltes/:recolteId/photos',
-)
+@Controller('recoltes/:recolteId/photos')
 @UseGuards(JwtAuthGuard)
 export class PhotosRecoltesUploadController {
-  constructor(
-    private readonly photosRecoltesService: PhotosRecoltesService,
-  ) {}
+  constructor(private readonly photosRecoltesService: PhotosRecoltesService) {}
 
   // =========================
   // UPLOADER UNE PHOTO
@@ -40,21 +37,11 @@ export class PhotosRecoltesUploadController {
 
         filename: (_req, file, callback) => {
           const uniqueSuffix =
-            Date.now() +
-            '-' +
-            Math.round(
-              Math.random() * 1e9,
-            );
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
 
-          const extension =
-            extname(
-              file.originalname,
-            ).toLowerCase();
+          const extension = extname(file.originalname).toLowerCase();
 
-          callback(
-            null,
-            `recolte-${uniqueSuffix}${extension}`,
-          );
+          callback(null, `recolte-${uniqueSuffix}${extension}`);
         },
       }),
 
@@ -62,28 +49,12 @@ export class PhotosRecoltesUploadController {
         fileSize: 5 * 1024 * 1024,
       },
 
-      fileFilter: (
-        _req,
-        file,
-        callback,
-      ) => {
-        const extension =
-          extname(
-            file.originalname,
-          ).toLowerCase();
+      fileFilter: (_req, file, callback) => {
+        const extension = extname(file.originalname).toLowerCase();
 
-        const extensionsAutorisees = [
-          '.jpg',
-          '.jpeg',
-          '.png',
-          '.webp',
-        ];
+        const extensionsAutorisees = ['.jpg', '.jpeg', '.png', '.webp'];
 
-        if (
-          !extensionsAutorisees.includes(
-            extension,
-          )
-        ) {
+        if (!extensionsAutorisees.includes(extension)) {
           return callback(
             new BadRequestException(
               'Format d’image non autorisé. Formats acceptés : JPG, JPEG, PNG, WEBP',
@@ -111,9 +82,7 @@ export class PhotosRecoltesUploadController {
     @Request() req: any,
   ) {
     if (!file) {
-      throw new BadRequestException(
-        'Aucune image n’a été envoyée',
-      );
+      throw new BadRequestException('Aucune image n’a été envoyée');
     }
 
     const url =
@@ -121,16 +90,14 @@ export class PhotosRecoltesUploadController {
       //`http://192.168.1.43:3000/uploads/recoltes/` +
       file.filename;
 
-    const photo =
-      await this.photosRecoltesService.upload(
-        recolteId,
-        req.user.id,
-        url,
-      );
+    const photo = await this.photosRecoltesService.upload(
+      recolteId,
+      req.user.id,
+      url,
+    );
 
     return {
-      message:
-        'Photo de récolte uploadée avec succès',
+      message: 'Photo de récolte uploadée avec succès',
       photo,
     };
   }

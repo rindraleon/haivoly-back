@@ -11,9 +11,7 @@ import { UpdateInterventionDto } from './dto/modification-intervention.dto';
 
 @Injectable()
 export class InterventionsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // =========================
   // CRÉER UNE INTERVENTION
@@ -35,17 +33,12 @@ export class InterventionsService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Une culture récoltée ou abandonnée
     // ne peut plus recevoir d'intervention
-    if (
-      culture.statut === 'RECOLTEE' ||
-      culture.statut === 'ABANDONNEE'
-    ) {
+    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
       throw new ForbiddenException(
         'Cette culture est terminée et ne peut plus recevoir d’intervention',
       );
@@ -53,9 +46,7 @@ export class InterventionsService {
 
     // Une culture supprimée n'est plus accessible
     if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     return this.prisma.intervention.create({
@@ -63,9 +54,7 @@ export class InterventionsService {
         type: dto.type,
         description: dto.description,
 
-        date: dto.date
-          ? new Date(dto.date)
-          : undefined,
+        date: dto.date ? new Date(dto.date) : undefined,
 
         produit: dto.produit,
         quantite: dto.quantite,
@@ -80,10 +69,7 @@ export class InterventionsService {
   // =========================
   // RÉCUPÉRER LES INTERVENTIONS
   // =========================
-  async findAll(
-    cultureId: string,
-    utilisateurId: string,
-  ) {
+  async findAll(cultureId: string, utilisateurId: string) {
     // Vérifier que la culture appartient
     // à l'utilisateur connecté
     const culture = await this.prisma.culture.findFirst({
@@ -96,16 +82,12 @@ export class InterventionsService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Une culture supprimée ne doit pas être consultable
     if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // RECOLTEE et ABANDONNEE restent consultables
@@ -122,28 +104,21 @@ export class InterventionsService {
   // =========================
   // RÉCUPÉRER UNE INTERVENTION
   // =========================
-  async findOne(
-    cultureId: string,
-    id: string,
-    utilisateurId: string,
-  ) {
-    const intervention =
-      await this.prisma.intervention.findFirst({
-        where: {
-          id,
-          cultureId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+  async findOne(cultureId: string, id: string, utilisateurId: string) {
+    const intervention = await this.prisma.intervention.findFirst({
+      where: {
+        id,
+        cultureId,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-      });
+      },
+    });
 
     if (!intervention) {
-      throw new NotFoundException(
-        'Intervention introuvable',
-      );
+      throw new NotFoundException('Intervention introuvable');
     }
 
     // Une culture supprimée ne doit pas être consultable
@@ -157,15 +132,11 @@ export class InterventionsService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // RECOLTEE et ABANDONNEE restent consultables
@@ -181,23 +152,20 @@ export class InterventionsService {
     dto: UpdateInterventionDto,
     utilisateurId: string,
   ) {
-    const intervention =
-      await this.prisma.intervention.findFirst({
-        where: {
-          id,
-          cultureId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+    const intervention = await this.prisma.intervention.findFirst({
+      where: {
+        id,
+        cultureId,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-      });
+      },
+    });
 
     if (!intervention) {
-      throw new NotFoundException(
-        'Intervention introuvable',
-      );
+      throw new NotFoundException('Intervention introuvable');
     }
 
     // Récupérer la culture pour vérifier son statut
@@ -211,17 +179,12 @@ export class InterventionsService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Une culture récoltée ou abandonnée
     // ne peut plus être modifiée
-    if (
-      culture.statut === 'RECOLTEE' ||
-      culture.statut === 'ABANDONNEE'
-    ) {
+    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
       throw new ForbiddenException(
         'Cette culture est terminée et ses interventions ne peuvent plus être modifiées',
       );
@@ -229,9 +192,7 @@ export class InterventionsService {
 
     // Une culture supprimée n'est plus accessible
     if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     return this.prisma.intervention.update({
@@ -273,28 +234,21 @@ export class InterventionsService {
   // =========================
   // SUPPRIMER UNE INTERVENTION
   // =========================
-  async remove(
-    cultureId: string,
-    id: string,
-    utilisateurId: string,
-  ) {
-    const intervention =
-      await this.prisma.intervention.findFirst({
-        where: {
-          id,
-          cultureId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
+  async remove(cultureId: string, id: string, utilisateurId: string) {
+    const intervention = await this.prisma.intervention.findFirst({
+      where: {
+        id,
+        cultureId,
+        culture: {
+          parcelle: {
+            utilisateurId,
           },
         },
-      });
+      },
+    });
 
     if (!intervention) {
-      throw new NotFoundException(
-        'Intervention introuvable',
-      );
+      throw new NotFoundException('Intervention introuvable');
     }
 
     // Récupérer la culture pour vérifier son statut
@@ -308,17 +262,12 @@ export class InterventionsService {
     });
 
     if (!culture) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     // Une culture récoltée ou abandonnée
     // ne peut plus supprimer ses interventions
-    if (
-      culture.statut === 'RECOLTEE' ||
-      culture.statut === 'ABANDONNEE'
-    ) {
+    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
       throw new ForbiddenException(
         'Cette culture est terminée et ses interventions ne peuvent plus être supprimées',
       );
@@ -326,9 +275,7 @@ export class InterventionsService {
 
     // Une culture supprimée n'est plus accessible
     if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Culture introuvable');
     }
 
     return this.prisma.intervention.delete({

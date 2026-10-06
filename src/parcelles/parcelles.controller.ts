@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -8,17 +7,31 @@ import {
   Patch,
   Post,
   Put,
-  Request,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
 import { ParcellesService } from './parcelles.service';
 import { CreateParcelleDto } from './dto/creation-parcelle.dto';
 import { UpdateParcelleDto } from './dto/modification-parcelle.dto';
-import { SupprimerParcelleDto } from './dto/supprimer-parcelle.dto';
-import { AjouterPointsGPSDto } from './dto/ajouter-points-gps.dto';
+import {
+  AjouterPointsGPSDto,
+  ModifierDelimitationDto,
+  SupprimerParcelleDto,
+} from './dto/delimitation.dto';
+
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ModifierDelimitationDto } from './dto/modifier-delimitation.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
+import { StatutParcelle } from '../common/enums/domain.enums';
+import { IsEnum, IsOptional } from 'class-validator';
+
+class ListeParcellesQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsEnum(StatutParcelle)
+  statut?: StatutParcelle;
+}
 
 @Controller('parcelles')
 @UseGuards(JwtAuthGuard)
@@ -26,53 +39,64 @@ export class ParcellesController {
   constructor(private readonly parcellesService: ParcellesService) {}
 
   @Post()
-  create(@Body() dto: CreateParcelleDto, @Request() req: any) {
-    return this.parcellesService.create(dto, req.user.id);
+  create(
+    @Body() dto: CreateParcelleDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcellesService.create(dto, user.id);
   }
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.parcellesService.findAll(req.user.id);
+  findAll(
+    @Query() query: ListeParcellesQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.parcellesService.findAll(
+      user.id,
+      query.page,
+      query.limit ?? 50,
+      query.statut,
+    );
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.parcellesService.findOne(id, user.id);
   }
 
   @Post(':id/points-gps')
   addPointsGPS(
     @Param('id') id: string,
     @Body() dto: AjouterPointsGPSDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.parcellesService.addPointsGPS(id, dto.pointsGPS, req.user.id);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string, @Request() req: any) {
-    return this.parcellesService.findOne(id, req.user.id);
+    return this.parcellesService.addPointsGPS(id, dto.pointsGPS, user.id);
   }
 
   @Put(':id/delimitation')
   updateDelimitation(
     @Param('id') id: string,
     @Body() dto: ModifierDelimitationDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.parcellesService.updateDelimitation(id, dto, req.user.id);
+    return this.parcellesService.updateDelimitation(id, dto, user.id);
   }
 
   @Patch(':id')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateParcelleDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.parcellesService.update(id, dto, req.user.id);
+    return this.parcellesService.update(id, dto, user.id);
   }
 
   @Delete(':id')
   remove(
     @Param('id') id: string,
     @Body() dto: SupprimerParcelleDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.parcellesService.remove(id, dto.raison, req.user.id);
+    return this.parcellesService.remove(id, dto.raison, user.id);
   }
 }

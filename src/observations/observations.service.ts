@@ -3,114 +3,105 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateObservationDto } from './dto/creation-observation.dto';
-import { UpdateObservationDto } from './dto/modification-observation.dto';
+import { Observation } from './entities/observation.entity';
+import { Culture } from '../cultures/entities/culture.entity';
+import { StatutCulture } from '../common/enums/domain.enums';
+import {
+  CreateObservationDto,
+  UpdateObservationDto,
+} from './dto/observation.dto';
+import { parseDate, requireDate } from '../common/utils/date.util';
 
 @Injectable()
 export class ObservationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(Observation)
+    private readonly observations: Repository<Observation>,
+    @InjectRepository(Culture)
+    private readonly cultures: Repository<Culture>,
+  ) {}
 
-  // =========================
-  // VÉRIFIER LA CULTURE
-  // =========================
-  private async verifierCulture(
-    parcelleId: string,
+  private async requireCulture(
     cultureId: string,
     utilisateurId: string,
-  ) {
-    const culture = await this.prisma.culture.findFirst({
+    parcelleId?: string,
+  ): Promise<Culture> {
+    const culture = await this.cultures.findOne({
       where: {
         id: cultureId,
-        parcelleId,
-        parcelle: {
-          utilisateurId,
-        },
+        ...(parcelleId ? { parcelleId } : {}),
+        parcelle: { utilisateurId },
       },
     });
 
-    if (!culture) {
+    if (!culture || culture.statut === StatutCulture.SUPPRIMEE) {
       throw new NotFoundException('Culture introuvable');
-    }
-
-    if (culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException('Cette culture est supprimée');
     }
 
     return culture;
   }
 
-  // =========================
-  // CRÉER UNE OBSERVATION
-  // =========================
+  private assertModifiable(culture: Culture, action: string): void {
+    if (
+      culture.statut === StatutCulture.RECOLTEE ||
+      culture.statut === StatutCulture.ABANDONNEE
+    ) {
+      throw new ForbiddenException(
+        `Impossible de ${action} une observation pour cette culture`,
+      );
+    }
+  }
+
   async create(
-    parcelleId: string,
     cultureId: string,
     dto: CreateObservationDto,
     utilisateurId: string,
+    parcelleId?: string,
   ) {
-    const culture = await this.verifierCulture(
-      parcelleId,
+    const culture = await this.requireCulture(
       cultureId,
       utilisateurId,
+      parcelleId,
     );
+    this.assertModifiable(culture, 'créer');
 
-    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
-      throw new ForbiddenException(
-        'Impossible de créer une observation pour cette culture',
-      );
-    }
+    const observation = this.observations.create({
+      description: dto.description.trim(),
+      date: dto.date ? requireDate(dto.date, 'date') : new Date(),
+      cultureId,
+    });
 
-    return this.prisma.observation.create({
-      data: {
-        description: dto.description,
+    return this.observations.save(observation);
+  }
 
-        date: dto.date ? new Date(dto.date) : undefined,
+  async findAll(
+    cultureId: string,
+    utilisateurId: string,
+    parcelleId?: string,
+  ): Promise<Observation[]> {
+    await this.requireCulture(cultureId, utilisateurId, parcelleId);
 
-        cultureId,
-      },
+    return this.observations.find({
+      where: { cultureId },
+      relations: { photos: true },
+      order: { date: 'DESC' },
     });
   }
 
-  // =========================
-  // RÉCUPÉRER LES OBSERVATIONS
-  // =========================
-  async findAll(parcelleId: string, cultureId: string, utilisateurId: string) {
-    await this.verifierCulture(parcelleId, cultureId, utilisateurId);
-
-    return this.prisma.observation.findMany({
-      where: {
-        cultureId,
-      },
-      orderBy: {
-        date: 'desc',
-      },
-      include: {
-        photos: true,
-      },
-    });
-  }
-
-  // =========================
-  // RÉCUPÉRER UNE OBSERVATION
-  // =========================
   async findOne(
-    parcelleId: string,
     cultureId: string,
     id: string,
     utilisateurId: string,
-  ) {
-    await this.verifierCulture(parcelleId, cultureId, utilisateurId);
+    parcelleId?: string,
+  ): Promise<Observation> {
+    await this.requireCulture(cultureId, utilisateurId, parcelleId);
 
-    const observation = await this.prisma.observation.findFirst({
-      where: {
-        id,
-        cultureId,
-      },
-      include: {
-        photos: true,
-      },
+    const observation = await this.observations.findOne({
+      where: { id, cultureId },
+      relations: { photos: true },
     });
 
     if (!observation) {
@@ -120,94 +111,116 @@ export class ObservationsService {
     return observation;
   }
 
-  // =========================
-  // MODIFIER UNE OBSERVATION
-  // =========================
   async update(
-    parcelleId: string,
     cultureId: string,
     id: string,
     dto: UpdateObservationDto,
     utilisateurId: string,
+    parcelleId?: string,
   ) {
-    const culture = await this.verifierCulture(
-      parcelleId,
+    const culture = await this.requireCulture(
       cultureId,
       utilisateurId,
+      parcelleId,
     );
+    this.assertModifiable(culture, 'modifier');
 
-    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
-      throw new ForbiddenException(
-        'Impossible de modifier une observation pour cette culture',
-      );
-    }
-
-    const observation = await this.prisma.observation.findFirst({
-      where: {
-        id,
-        cultureId,
-      },
+    const observation = await this.observations.findOne({
+      where: { id, cultureId },
     });
 
     if (!observation) {
       throw new NotFoundException('Observation introuvable');
     }
 
-    return this.prisma.observation.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(dto.description !== undefined && {
-          description: dto.description,
-        }),
+    Object.assign(observation, {
+      ...(dto.description !== undefined && {
+        description: dto.description.trim(),
+      }),
+      ...(dto.date !== undefined && {
+        date: parseDate(dto.date) ?? observation.date,
+      }),
+    });
 
-        ...(dto.date !== undefined && {
-          date: new Date(dto.date),
-        }),
-      },
-      include: {
-        photos: true,
-      },
+    await this.observations.save(observation);
+
+    return this.observations.findOne({
+      where: { id },
+      relations: { photos: true },
     });
   }
 
-  // =========================
-  // SUPPRIMER UNE OBSERVATION
-  // =========================
   async remove(
-    parcelleId: string,
     cultureId: string,
     id: string,
     utilisateurId: string,
+    parcelleId?: string,
   ) {
-    const culture = await this.verifierCulture(
-      parcelleId,
+    const culture = await this.requireCulture(
       cultureId,
       utilisateurId,
+      parcelleId,
     );
+    this.assertModifiable(culture, 'supprimer');
 
-    if (culture.statut === 'RECOLTEE' || culture.statut === 'ABANDONNEE') {
-      throw new ForbiddenException(
-        'Impossible de supprimer une observation pour cette culture',
-      );
-    }
-
-    const observation = await this.prisma.observation.findFirst({
-      where: {
-        id,
-        cultureId,
-      },
+    const observation = await this.observations.findOne({
+      where: { id, cultureId },
     });
 
     if (!observation) {
       throw new NotFoundException('Observation introuvable');
     }
 
-    return this.prisma.observation.delete({
+    await this.observations.remove(observation);
+    return { id, deleted: true };
+  }
+
+  /**
+   * Routes plates `/observations/:id` (utilisées par le mobile) : la culture
+   * est retrouvée à partir de l'observation, puis l'ownership est vérifié avec
+   * exactement la même règle que les routes imbriquées.
+   */
+  async findOneById(id: string, utilisateurId: string): Promise<Observation> {
+    const observation = await this.requireOwnedObservation(id, utilisateurId);
+    return this.findOne(observation.cultureId, id, utilisateurId);
+  }
+
+  async updateById(
+    id: string,
+    dto: UpdateObservationDto,
+    utilisateurId: string,
+  ) {
+    const observation = await this.requireOwnedObservation(id, utilisateurId);
+    return this.update(observation.cultureId, id, dto, utilisateurId);
+  }
+
+  async removeById(id: string, utilisateurId: string) {
+    const observation = await this.requireOwnedObservation(id, utilisateurId);
+    return this.remove(observation.cultureId, id, utilisateurId);
+  }
+
+  /** Vérification d'ownership partagée avec le module photos. */
+  async requireOwnedObservation(
+    observationId: string,
+    utilisateurId: string,
+    cultureId?: string,
+  ): Promise<Observation> {
+    const observation = await this.observations.findOne({
       where: {
-        id,
+        id: observationId,
+        ...(cultureId ? { cultureId } : {}),
+        culture: { parcelle: { utilisateurId } },
       },
+      relations: { culture: true },
     });
+
+    if (
+      !observation ||
+      observation.culture?.statut === StatutCulture.SUPPRIMEE
+    ) {
+      throw new NotFoundException('Observation introuvable');
+    }
+
+    return observation;
   }
 }

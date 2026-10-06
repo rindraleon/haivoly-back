@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -7,115 +6,146 @@ import {
   Param,
   Patch,
   Post,
-  Put,
-  Request,
+  Query,
   UseGuards,
 } from '@nestjs/common';
+import { Type } from 'class-transformer';
+import { IsArray, IsEnum, IsOptional, ValidateNested } from 'class-validator';
 
 import { CulturesService } from './cultures.service';
 import { CreateCultureDto } from './dto/creation-culture.dto';
 import { UpdateCultureDto } from './dto/modification-culture.dto';
-import { PointsGPSCultureDto } from './dto/points-gps-culture.dto';
+import { PointGPSCultureInputDto } from './dto/creation-culture.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { StatutCulture } from '../common/enums/domain.enums';
 
-@Controller('parcelles/:parcelleId/cultures')
+class PointsGPSCultureDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PointGPSCultureInputDto)
+  points: PointGPSCultureInputDto[];
+}
+
+class DeleteCultureDto {
+  @IsOptional()
+  raison?: string;
+}
+
+class ListeCulturesQueryDto extends PaginationQueryDto {
+  @IsOptional()
+  @IsEnum(StatutCulture)
+  statut?: StatutCulture;
+}
+
+@Controller()
 @UseGuards(JwtAuthGuard)
 export class CulturesController {
   constructor(private readonly culturesService: CulturesService) {}
 
-  // =========================
-  // CRÉER UNE CULTURE
-  // =========================
-  @Post()
-  create(
-    @Param('parcelleId') parcelleId: string,
-    @Body() dto: CreateCultureDto,
-    @Request() req: any,
+  // =========================================================
+  // Vues transverses (toutes les cultures de l'utilisateur)
+  // =========================================================
+  @Get('cultures')
+  findAllForUser(
+    @Query() query: ListeCulturesQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.culturesService.create(parcelleId, dto, req.user.id);
-  }
-
-  // =========================
-  // RÉCUPÉRER LES CULTURES
-  // D'UNE PARCELLE
-  // =========================
-  @Get()
-  findAll(@Param('parcelleId') parcelleId: string, @Request() req: any) {
-    return this.culturesService.findAll(parcelleId, req.user.id);
-  }
-
-  // =========================
-  // RÉCUPÉRER LES POINTS GPS D'UNE CULTURE
-  // =========================
-
-  @Get(':id/points-gps')
-  findPointsGPS(
-    @Param('parcelleId') parcelleId: string,
-    @Param('id') id: string,
-    @Request() req: any,
-  ) {
-    return this.culturesService.findPointsGPS(parcelleId, id, req.user.id);
-  }
-
-  // =========================
-  // ENREGISTRER LES POINTS GPS D'UNE CULTURE
-  // =========================
-
-  @Post(':id/points-gps')
-  savePointsGPS(
-    @Param('parcelleId') parcelleId: string,
-    @Param('id') id: string,
-    @Body() dto: PointsGPSCultureDto,
-    @Request() req: any,
-  ) {
-    return this.culturesService.savePointsGPS(
-      parcelleId,
-      id,
-      req.user.id,
-      dto.points,
+    return this.culturesService.findAllForUser(
+      user.id,
+      query.page,
+      query.limit ?? 50,
+      query.statut,
     );
   }
 
-  // =========================
-  // RÉCUPÉRER UNE CULTURE
-  // =========================
-  @Get(':id')
+  // =========================================================
+  // Cultures d'une parcelle
+  // =========================================================
+  @Post('parcelles/:parcelleId/cultures')
+  create(
+    @Param('parcelleId') parcelleId: string,
+    @Body() dto: CreateCultureDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.culturesService.create(parcelleId, dto, user.id);
+  }
+
+  @Get('parcelles/:parcelleId/cultures')
+  findAll(
+    @Param('parcelleId') parcelleId: string,
+    @Query() query: ListeCulturesQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.culturesService.findAll(
+      parcelleId,
+      user.id,
+      query.page,
+      query.limit ?? 50,
+    );
+  }
+
+  @Get('parcelles/:parcelleId/cultures/:id')
   findOne(
     @Param('parcelleId') parcelleId: string,
     @Param('id') id: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.culturesService.findOne(parcelleId, id, req.user.id);
+    return this.culturesService.findOne(parcelleId, id, user.id);
   }
 
-  // =========================
-  // MODIFIER UNE CULTURE
-  // =========================
-  @Patch(':id')
+  /** Route plate (mobile) : la parcelle n'est pas nécessaire dans l'URL. */
+  @Get('cultures/:id')
+  findOneFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.culturesService.findOne(undefined, id, user.id);
+  }
+
+  @Patch('parcelles/:parcelleId/cultures/:id')
   update(
     @Param('parcelleId') parcelleId: string,
     @Param('id') id: string,
     @Body() dto: UpdateCultureDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.culturesService.update(parcelleId, id, dto, req.user.id);
+    return this.culturesService.update(parcelleId, id, dto, user.id);
   }
 
-  // =========================
-  // SUPPRESSION LOGIQUE
-  // =========================
-  @Delete(':id')
+  @Delete('parcelles/:parcelleId/cultures/:id')
   remove(
     @Param('parcelleId') parcelleId: string,
     @Param('id') id: string,
-    @Body() body: { raison?: string },
-    @Request() req: any,
+    @Body() dto: DeleteCultureDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.culturesService.remove(
+    return this.culturesService.remove(parcelleId, id, user.id, dto?.raison);
+  }
+
+  // =========================================================
+  // Délimitation GPS d'une culture
+  // =========================================================
+  @Get('parcelles/:parcelleId/cultures/:id/points-gps')
+  findPointsGPS(
+    @Param('parcelleId') parcelleId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.culturesService.findPointsGPS(parcelleId, id, user.id);
+  }
+
+  @Post('parcelles/:parcelleId/cultures/:id/points-gps')
+  savePointsGPS(
+    @Param('parcelleId') parcelleId: string,
+    @Param('id') id: string,
+    @Body() dto: PointsGPSCultureDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.culturesService.savePointsGPS(
       parcelleId,
       id,
-      req.user.id,
-      body.raison,
+      user.id,
+      dto.points,
     );
   }
 }

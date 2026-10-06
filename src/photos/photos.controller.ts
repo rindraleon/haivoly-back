@@ -1,5 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,102 +7,174 @@ import {
   Param,
   Patch,
   Post,
-  Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 import { PhotosService } from './photos.service';
-
-import { CreatePhotoDto } from './dto/creation-photo.dto';
-import { UpdatePhotoDto } from './dto/modification-photo.dto';
-
+import { CreatePhotoDto, UpdatePhotoDto } from './dto/photo.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
+import { imageUploadOptions } from '../common/utils/upload.util';
 
-@Controller(
-  'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos',
-)
+interface UploadedImage {
+  filename: string;
+  originalname: string;
+  mimetype: string;
+  size: number;
+}
+
+const uploadOptions = imageUploadOptions('observations', 'observation');
+
+@Controller()
 @UseGuards(JwtAuthGuard)
 export class PhotosController {
   constructor(private readonly photosService: PhotosService) {}
 
-  // =========================
-  // AJOUTER UNE PHOTO
-  // =========================
-  @Post()
-  create(
+  // ── Routes imbriquées historiques ──────────────────────────
+
+  @Post(
+    'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos',
+  )
+  createNested(
     @Param('cultureId') cultureId: string,
     @Param('observationId') observationId: string,
-    @Body() createPhotoDto: CreatePhotoDto,
-    @Request() req: any,
+    @Body() dto: CreatePhotoDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.photosService.create(
+    return this.photosService.create(observationId, cultureId, dto, user.id);
+  }
+
+  @Post(
+    'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos/upload',
+  )
+  @UseInterceptors(FileInterceptor('file', uploadOptions))
+  uploadNested(
+    @Param('cultureId') cultureId: string,
+    @Param('observationId') observationId: string,
+    @UploadedFile() file: UploadedImage | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Aucune image n’a été envoyée');
+    }
+    return this.photosService.upload(
       observationId,
       cultureId,
-      createPhotoDto,
-      req.user.id,
+      user.id,
+      `/uploads/observations/${file.filename}`,
     );
   }
 
-  // =========================
-  // RÉCUPÉRER LES PHOTOS
-  // =========================
-  @Get()
-  findAll(
+  @Get(
+    'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos',
+  )
+  findAllNested(
     @Param('cultureId') cultureId: string,
     @Param('observationId') observationId: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.photosService.findAll(observationId, cultureId, req.user.id);
+    return this.photosService.findAll(observationId, cultureId, user.id);
   }
 
-  // =========================
-  // RÉCUPÉRER UNE PHOTO
-  // =========================
-  @Get(':id')
-  findOne(
+  @Get(
+    'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos/:id',
+  )
+  findOneNested(
     @Param('cultureId') cultureId: string,
     @Param('observationId') observationId: string,
     @Param('id') id: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.photosService.findOne(
-      observationId,
-      cultureId,
-      id,
-      req.user.id,
-    );
+    return this.photosService.findOne(observationId, cultureId, id, user.id);
   }
 
-  // =========================
-  // MODIFIER UNE PHOTO
-  // =========================
-  @Patch(':id')
-  update(
+  @Patch(
+    'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos/:id',
+  )
+  updateNested(
     @Param('cultureId') cultureId: string,
     @Param('observationId') observationId: string,
     @Param('id') id: string,
-    @Body() updatePhotoDto: UpdatePhotoDto,
-    @Request() req: any,
+    @Body() dto: UpdatePhotoDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.photosService.update(
       observationId,
       cultureId,
       id,
-      updatePhotoDto,
-      req.user.id,
+      dto,
+      user.id,
     );
   }
 
-  // =========================
-  // SUPPRIMER UNE PHOTO
-  // =========================
-  @Delete(':id')
-  remove(
+  @Delete(
+    'parcelles/:parcelleId/cultures/:cultureId/observations/:observationId/photos/:id',
+  )
+  removeNested(
     @Param('cultureId') cultureId: string,
     @Param('observationId') observationId: string,
     @Param('id') id: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.photosService.remove(observationId, cultureId, id, req.user.id);
+    return this.photosService.remove(observationId, cultureId, id, user.id);
+  }
+
+  // ── Routes courtes (mobile) ────────────────────────────────
+
+  @Post('observations/:observationId/photos')
+  create(
+    @Param('observationId') observationId: string,
+    @Body() dto: CreatePhotoDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.photosService.create(observationId, '', dto, user.id);
+  }
+
+  @Post('observations/:observationId/photos/upload')
+  @UseInterceptors(FileInterceptor('file', uploadOptions))
+  upload(
+    @Param('observationId') observationId: string,
+    @UploadedFile() file: UploadedImage | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Aucune image n’a été envoyée');
+    }
+    return this.photosService.upload(
+      observationId,
+      '',
+      user.id,
+      `/uploads/observations/${file.filename}`,
+    );
+  }
+
+  @Get('observations/:observationId/photos')
+  findAll(
+    @Param('observationId') observationId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.photosService.findAll(observationId, '', user.id);
+  }
+
+  @Get('observations/:observationId/photos/:id')
+  findOne(
+    @Param('observationId') observationId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.photosService.findOne(observationId, '', id, user.id);
+  }
+
+  @Delete('observations/:observationId/photos/:id')
+  remove(
+    @Param('observationId') observationId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.photosService.remove(observationId, '', id, user.id);
   }
 }

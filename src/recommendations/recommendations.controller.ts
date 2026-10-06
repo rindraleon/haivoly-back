@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -8,59 +7,71 @@ import {
   Patch,
   Post,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
+
 import { RecommendationsService } from './recommendations.service';
-import { CreateRecommendationDto } from './dto/create-recommendation.dto';
+import {
+  CreateRecommendationDto,
+  RecommendationQueryDto,
+} from './dto/recommendation.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
 
 @Controller('recommendations')
 @UseGuards(JwtAuthGuard)
 export class RecommendationsController {
-  constructor(private readonly recos: RecommendationsService) {}
+  constructor(
+    private readonly recommendationsService: RecommendationsService,
+  ) {}
 
   @Post()
-  async create(@Body() dto: CreateRecommendationDto) {
-    return this.recos.create(dto);
+  create(@Body() dto: CreateRecommendationDto) {
+    return this.recommendationsService.create(dto);
+  }
+
+  /** Recommandations de l'utilisateur connecté. */
+  @Get('me')
+  forMe(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('unreadOnly') unreadOnly?: string,
+    @Query('includeExpired') includeExpired?: string,
+  ) {
+    return this.recommendationsService.findForUser(
+      user.id,
+      unreadOnly === 'true',
+      includeExpired === 'true',
+    );
+  }
+
+  @Get('me/unread-count')
+  unreadCount(@CurrentUser() user: AuthenticatedUser) {
+    return this.recommendationsService.unreadCount(user.id);
   }
 
   @Get()
-  async findAll(
-    @Query('userId') userId?: string,
-    @Query('type') type?: string,
-    @Query('priority') priority?: string,
-    @Query('unread') unread?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
-    return this.recos.findAll({
-      userId,
-      type,
-      priority,
-      unread,
-      page: page ? Number(page) : undefined,
-      limit: limit ? Number(limit) : undefined,
-    });
-  }
-
-  @Get('me')
-  async forMe(@Request() req: any, @Query('unreadOnly') unreadOnly?: string) {
-    return this.recos.findForUser(req.user.id, unreadOnly !== 'true');
-  }
-
-  @Patch(':id/read')
-  async markRead(@Param('id') id: string) {
-    return this.recos.markRead(id);
+  findAll(@Query() query: RecommendationQueryDto) {
+    return this.recommendationsService.findAll(query);
   }
 
   @Patch('read-all')
-  async markAllRead(@Request() req: any) {
-    return this.recos.markAllReadForUser(req.user.id);
+  markAllRead(@CurrentUser() user: AuthenticatedUser) {
+    return this.recommendationsService.markAllReadForUser(user.id);
+  }
+
+  @Patch(':id/read')
+  markRead(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.recommendationsService.markRead(id, user.id);
+  }
+
+  @Patch(':id/unread')
+  markUnread(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.recommendationsService.markUnread(id, user.id);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.recos.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.recommendationsService.remove(id, user.id);
   }
 }

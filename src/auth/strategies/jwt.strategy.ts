@@ -1,29 +1,44 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import { PrismaService } from '../../prisma/prisma.service';
+import { Utilisateur } from '../../users/entities/utilisateur.entity';
+import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+
+export interface JwtPayload {
+  sub: string;
+  email: string;
+  role: string;
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
+    configService: ConfigService,
+    @InjectRepository(Utilisateur)
+    private readonly utilisateurs: Repository<Utilisateur>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET')!,
+      secretOrKey: configService.get<string>('JWT_SECRET') ?? 'change-me',
     });
   }
 
-  async validate(payload: any) {
-    const utilisateur = await this.prisma.utilisateur.findUnique({
-      where: {
-        id: payload.sub,
-      },
+  /**
+   * L'utilisateur est rechargé à chaque requête : un compte supprimé ou
+   * un token forgé ne peut donc pas accéder aux ressources.
+   */
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
+    if (!payload?.sub) {
+      throw new UnauthorizedException('Token invalide');
+    }
+
+    const utilisateur = await this.utilisateurs.findOne({
+      where: { id: payload.sub },
     });
 
     if (!utilisateur) {

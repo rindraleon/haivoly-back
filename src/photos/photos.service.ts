@@ -3,152 +3,121 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import { PrismaService } from '../prisma/prisma.service';
-
-import { CreatePhotoDto } from './dto/creation-photo.dto';
-import { UpdatePhotoDto } from './dto/modification-photo.dto';
+import { Photo } from './entities/photo.entity';
+import { Observation } from '../observations/entities/observation.entity';
+import { StatutCulture } from '../common/enums/domain.enums';
+import { normalizeUploadUrl } from '../common/utils/upload.util';
+import { CreatePhotoDto, UpdatePhotoDto } from './dto/photo.dto';
 
 @Injectable()
 export class PhotosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(Photo)
+    private readonly photos: Repository<Photo>,
+    @InjectRepository(Observation)
+    private readonly observations: Repository<Observation>,
+  ) {}
 
-  // =========================
-  // VÉRIFIER L'OBSERVATION
-  // =========================
-  private async verifierObservation(
+  private async requireObservation(
     observationId: string,
-    cultureId: string,
     utilisateurId: string,
-  ) {
-    const observation = await this.prisma.observation.findFirst({
+    cultureId?: string,
+  ): Promise<Observation> {
+    const observation = await this.observations.findOne({
       where: {
         id: observationId,
-        cultureId,
-        culture: {
-          parcelle: {
-            utilisateurId,
-          },
-        },
+        ...(cultureId ? { cultureId } : {}),
+        culture: { parcelle: { utilisateurId } },
       },
-      include: {
-        culture: true,
-      },
+      relations: { culture: true },
     });
 
-    if (!observation) {
+    if (
+      !observation ||
+      observation.culture?.statut === StatutCulture.SUPPRIMEE
+    ) {
       throw new NotFoundException('Observation introuvable');
-    }
-
-    if (observation.culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException('Culture introuvable');
     }
 
     return observation;
   }
 
-  // =========================
-  // AJOUTER UNE PHOTO
-  // =========================
+  private assertModifiable(observation: Observation, action: string): void {
+    const statut = observation.culture?.statut;
+    if (
+      statut === StatutCulture.RECOLTEE ||
+      statut === StatutCulture.ABANDONNEE
+    ) {
+      throw new ForbiddenException(
+        `Impossible de ${action} une photo d’une observation d’une culture terminée`,
+      );
+    }
+  }
+
   async create(
     observationId: string,
     cultureId: string,
     dto: CreatePhotoDto,
     utilisateurId: string,
   ) {
-    const observation = await this.verifierObservation(
+    const observation = await this.requireObservation(
       observationId,
-      cultureId,
       utilisateurId,
+      cultureId,
     );
+    this.assertModifiable(observation, 'ajouter');
 
-    if (
-      observation.culture.statut === 'RECOLTEE' ||
-      observation.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible d’ajouter une photo à une observation d’une culture terminée',
-      );
-    }
-
-    return this.prisma.photo.create({
-      data: {
-        url: dto.url,
+    return this.photos.save(
+      this.photos.create({
+        url: normalizeUploadUrl(dto.url, 'observations'),
         observationId,
-      },
-    });
+      }),
+    );
   }
 
-  // =========================
-  // UPLOADER UNE PHOTO
-  // =========================
   async upload(
     observationId: string,
     cultureId: string,
     utilisateurId: string,
-    url: string,
+    relativeUrl: string,
   ) {
-    const observation = await this.verifierObservation(
+    const observation = await this.requireObservation(
       observationId,
-      cultureId,
       utilisateurId,
+      cultureId,
     );
+    this.assertModifiable(observation, 'ajouter');
 
-    if (
-      observation.culture.statut === 'RECOLTEE' ||
-      observation.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible d’ajouter une photo à une observation d’une culture terminée',
-      );
-    }
-
-    return this.prisma.photo.create({
-      data: {
-        url,
-        observationId,
-      },
-    });
+    return this.photos.save(
+      this.photos.create({ url: relativeUrl, observationId }),
+    );
   }
 
-  // =========================
-  // RÉCUPÉRER LES PHOTOS
-  // =========================
   async findAll(
     observationId: string,
     cultureId: string,
     utilisateurId: string,
   ) {
-    await this.verifierObservation(observationId, cultureId, utilisateurId);
+    await this.requireObservation(observationId, utilisateurId, cultureId);
 
-    return this.prisma.photo.findMany({
-      where: {
-        observationId,
-      },
-      orderBy: {
-        dateAjout: 'desc',
-      },
+    return this.photos.find({
+      where: { observationId },
+      order: { dateAjout: 'DESC' },
     });
   }
 
-  // =========================
-  // RÉCUPÉRER UNE PHOTO
-  // =========================
   async findOne(
     observationId: string,
     cultureId: string,
     id: string,
     utilisateurId: string,
   ) {
-    await this.verifierObservation(observationId, cultureId, utilisateurId);
+    await this.requireObservation(observationId, utilisateurId, cultureId);
 
-    const photo = await this.prisma.photo.findFirst({
-      where: {
-        id,
-        observationId,
-      },
-    });
-
+    const photo = await this.photos.findOne({ where: { id, observationId } });
     if (!photo) {
       throw new NotFoundException('Photo introuvable');
     }
@@ -156,9 +125,6 @@ export class PhotosService {
     return photo;
   }
 
-  // =========================
-  // MODIFIER UNE PHOTO
-  // =========================
   async update(
     observationId: string,
     cultureId: string,
@@ -166,65 +132,48 @@ export class PhotosService {
     dto: UpdatePhotoDto,
     utilisateurId: string,
   ) {
-    const observation = await this.verifierObservation(
+    const observation = await this.requireObservation(
+      observationId,
+      utilisateurId,
+      cultureId,
+    );
+    this.assertModifiable(observation, 'modifier');
+
+    const photo = await this.findOne(
       observationId,
       cultureId,
+      id,
       utilisateurId,
     );
 
-    if (
-      observation.culture.statut === 'RECOLTEE' ||
-      observation.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible de modifier une photo d’une observation d’une culture terminée',
-      );
+    if (dto.url !== undefined) {
+      photo.url = normalizeUploadUrl(dto.url, 'observations');
     }
 
-    await this.findOne(observationId, cultureId, id, utilisateurId);
-
-    return this.prisma.photo.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(dto.url !== undefined && {
-          url: dto.url,
-        }),
-      },
-    });
+    return this.photos.save(photo);
   }
 
-  // =========================
-  // SUPPRIMER UNE PHOTO
-  // =========================
   async remove(
     observationId: string,
     cultureId: string,
     id: string,
     utilisateurId: string,
   ) {
-    const observation = await this.verifierObservation(
+    const observation = await this.requireObservation(
+      observationId,
+      utilisateurId,
+      cultureId,
+    );
+    this.assertModifiable(observation, 'supprimer');
+
+    const photo = await this.findOne(
       observationId,
       cultureId,
+      id,
       utilisateurId,
     );
+    await this.photos.remove(photo);
 
-    if (
-      observation.culture.statut === 'RECOLTEE' ||
-      observation.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible de supprimer une photo d’une observation d’une culture terminée',
-      );
-    }
-
-    await this.findOne(observationId, cultureId, id, utilisateurId);
-
-    return this.prisma.photo.delete({
-      where: {
-        id,
-      },
-    });
+    return { id, deleted: true };
   }
 }

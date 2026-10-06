@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ActionsService } from './actions.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { ActionsController } from './actions.controller';
-import { PrismaModule } from '../prisma/prisma.module';
+import { ActionsService } from './actions.service';
+import { Action } from './entities/action.entity';
+import { Recommendation } from '../recommendations/entities/recommendation.entity';
+import { Utilisateur } from '../users/entities/utilisateur.entity';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [TypeOrmModule.forFeature([Action, Recommendation, Utilisateur])],
   controllers: [ActionsController],
   providers: [ActionsService],
   exports: [ActionsService],

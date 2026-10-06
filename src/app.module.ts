@@ -1,43 +1,60 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
-import { PrismaModule } from './prisma/prisma.module';
+import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { ParcellesModule } from './parcelles/parcelles.module';
+import { PointsGpsModule } from './points-gps/points-gps.module';
 import { CulturesModule } from './cultures/cultures.module';
 import { InterventionsModule } from './interventions/interventions.module';
 import { ObservationsModule } from './observations/observations.module';
+import { RecoltesModule } from './recoltes/recoltes.module';
 import { PhotosModule } from './photos/photos.module';
 import { PhotosInterventionsModule } from './photos-interventions/photos-interventions.module';
-import { DashboardModule } from './dashboard/dashboard.module';
-import { SyncModule } from './sync/sync.module';
-import { RecoltesModule } from './recoltes/recoltes.module';
 import { PhotosRecoltesModule } from './photos-recoltes/photos-recoltes.module';
-import { ActionsModule } from './actions/actions.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { ActionsModule } from './actions/actions.module';
+import { SynchronizationModule } from './synchronization/synchronization.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { HealthModule } from './health/health.module';
+import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    JwtModule.register({
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '7d' },
+    DatabaseModule,
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: () => ({
+        throttlers: [{ ttl: 60_000, limit: 300 }],
+      }),
     }),
-    PrismaModule,
+
+    // Domaines
     AuthModule,
+    UsersModule,
     ParcellesModule,
+    PointsGpsModule,
     CulturesModule,
     InterventionsModule,
     ObservationsModule,
+    RecoltesModule,
     PhotosModule,
     PhotosInterventionsModule,
-    DashboardModule,
-    SyncModule,
-    RecoltesModule,
     PhotosRecoltesModule,
-    ActionsModule,
     RecommendationsModule,
+    ActionsModule,
+    SynchronizationModule,
+    DashboardModule,
+
+    HealthModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

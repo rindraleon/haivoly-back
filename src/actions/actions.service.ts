@@ -1,155 +1,153 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
+
+import { Action } from './entities/action.entity';
+import { Recommendation } from '../recommendations/entities/recommendation.entity';
+import { Utilisateur } from '../users/entities/utilisateur.entity';
 import { CreateActionDto } from './dto/create-action.dto';
+import {
+  RecommendationPriority,
+  RecommendationType,
+  SyncStatus,
+} from '../common/enums/domain.enums';
+import { parseDate } from '../common/utils/date.util';
+import { PaginatedResult, paginate } from '../common/dto/pagination.dto';
+
+export interface ActionQuery {
+  userId?: string;
+  actionType?: string;
+  entityType?: string;
+  syncStatus?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
 
 @Injectable()
 export class ActionsService {
   private readonly logger = new Logger(ActionsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(Action)
+    private readonly actions: Repository<Action>,
+    @InjectRepository(Recommendation)
+    private readonly recommendations: Repository<Recommendation>,
+    @InjectRepository(Utilisateur)
+    private readonly utilisateurs: Repository<Utilisateur>,
+  ) {}
 
+  /**
+   * Enregistre une action déjà appliquée côté métier (mode online).
+   * L'idempotence est garantie par l'index unique sur `clientId`.
+   */
   async create(userId: string, dto: CreateActionDto) {
-    // Idempotence via clientId
     if (dto.clientId) {
-      const existing = await this.prisma.action.findUnique({
+      const existing = await this.actions.findOne({
         where: { clientId: dto.clientId },
       });
+
       if (existing) {
-        return { id: dto.clientId, status: 'DUPLICATE', action: existing };
+        return {
+          id: dto.clientId,
+          status: 'DUPLICATE' as const,
+          action: existing,
+        };
       }
     }
 
-    const action = await this.prisma.action.create({
-      data: {
-        clientId: dto.clientId,
+    const action = await this.actions.save(
+      this.actions.create({
+        clientId: dto.clientId ?? null,
         userId,
         actionType: dto.actionType,
         entityType: dto.entityType,
-        entityId: dto.entityId,
-        payload: dto.payload as any,
-        deviceId: dto.deviceId,
-        timestamp: dto.timestamp ? new Date(dto.timestamp) : new Date(),
-        syncStatus: 'SYNCED',
+        entityId: dto.entityId ?? null,
+        payload: dto.payload ?? null,
+        metadata: dto.metadata ?? null,
+        deviceId: dto.deviceId ?? null,
+        timestamp: parseDate(dto.timestamp) ?? new Date(),
+        syncStatus: SyncStatus.SYNCED,
         syncedAt: new Date(),
-        metadata: dto.metadata as any,
-      },
-      include: {
-        utilisateur: {
-          select: { id: true, nom: true, prenom: true, email: true },
-        },
-      },
+      }),
+    );
+
+    await this.triggerRecommendationRules({
+      userId,
+      actionType: `${dto.actionType}_${dto.entityType}`,
+      payload: dto.payload ?? null,
+      entityType: dto.entityType,
     });
 
-    // Déclencher règles de recommandation (extensible)
-    await this.triggerRecommendations(action);
-
-    return { id: action.clientId ?? action.id, status: 'SYNCED', action };
-  }
-
-  async batchSync(userId: string, actions: CreateActionDto[]) {
-    const results: Array<{ id: string; status: string; message?: string }> = [];
-
-    for (const dto of actions) {
-      try {
-        // Validation simple
-        if (!dto.actionType || !dto.entityType) {
-          results.push({
-            id: dto.clientId ?? 'unknown',
-            status: 'INVALID',
-            message: 'actionType/entityType requis',
-          });
-          continue;
-        }
-
-        if (dto.clientId) {
-          const dup = await this.prisma.action.findUnique({
-            where: { clientId: dto.clientId },
-          });
-          if (dup) {
-            results.push({ id: dto.clientId, status: 'DUPLICATE' });
-            continue;
-          }
-        }
-
-        const res = await this.create(userId, dto);
-        results.push({ id: dto.clientId ?? res.action.id, status: res.status });
-      } catch (e: any) {
-        this.logger.error(`batchSync error for ${dto.clientId}`, e);
-        results.push({
-          id: dto.clientId ?? 'unknown',
-          status: 'FAILED',
-          message: e.message,
-        });
-      }
-    }
-
-    return { results };
-  }
-
-  async findAll(query: {
-    userId?: string;
-    actionType?: string;
-    entityType?: string;
-    syncStatus?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-    sort?: string;
-  }) {
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
-    const skip = (page - 1) * limit;
-
-    const where: any = {};
-    if (query.userId) where.userId = query.userId;
-    if (query.actionType) where.actionType = query.actionType;
-    if (query.entityType) where.entityType = query.entityType;
-    if (query.syncStatus) where.syncStatus = query.syncStatus;
-    if (query.search) {
-      where.OR = [
-        { actionType: { contains: query.search, mode: 'insensitive' } },
-        { entityType: { contains: query.search, mode: 'insensitive' } },
-        { entityId: { contains: query.search, mode: 'insensitive' } },
-      ];
-    }
-
-    const [data, total] = await Promise.all([
-      this.prisma.action.findMany({
-        where,
-        include: {
-          utilisateur: {
-            select: { id: true, nom: true, prenom: true, email: true },
-          },
-        },
-        orderBy: { timestamp: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.action.count({ where }),
-    ]);
-
     return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
+      id: action.clientId ?? action.id,
+      status: 'SYNCED' as const,
+      action,
     };
   }
 
-  async findOne(id: string) {
-    return this.prisma.action.findUnique({
+  async findAll(query: ActionQuery): Promise<PaginatedResult<Action>> {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+
+    const qb = this.actions
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.utilisateur', 'u')
+      .orderBy('a.timestamp', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (query.userId)
+      qb.andWhere('a.userId = :userId', { userId: query.userId });
+    if (query.actionType) {
+      qb.andWhere('a.actionType = :actionType', {
+        actionType: query.actionType,
+      });
+    }
+    if (query.entityType) {
+      qb.andWhere('a.entityType = :entityType', {
+        entityType: query.entityType,
+      });
+    }
+    if (query.syncStatus) {
+      qb.andWhere('a.syncStatus = :syncStatus', {
+        syncStatus: query.syncStatus,
+      });
+    }
+    if (query.search) {
+      qb.andWhere(
+        '(a.actionType ILIKE :search OR a.entityType ILIKE :search OR a.entityId ILIKE :search)',
+        { search: `%${query.search}%` },
+      );
+    }
+
+    const [items, total] = await qb.getManyAndCount();
+    return paginate(items, total, page, limit);
+  }
+
+  async findOne(id: string): Promise<Action> {
+    const action = await this.actions.findOne({
       where: { id },
-      include: {
-        utilisateur: {
-          select: { id: true, nom: true, prenom: true, email: true },
-        },
-      },
+      relations: { utilisateur: true },
+    });
+
+    if (!action) {
+      throw new NotFoundException('Action introuvable');
+    }
+
+    return action;
+  }
+
+  /** Actions en échec de l'utilisateur (écran « synchronisation » mobile). */
+  async failedForUser(userId: string): Promise<Action[]> {
+    return this.actions.find({
+      where: { userId, syncStatus: SyncStatus.FAILED },
+      order: { updatedAt: 'DESC' },
+      take: 100,
     });
   }
 
-  async getDashboardStats() {
+  async stats() {
     const now = new Date();
     const startOfDay = new Date(
       now.getFullYear(),
@@ -159,84 +157,117 @@ export class ActionsService {
 
     const [totalUsers, totalActions, today, synced, pending, failed, recos] =
       await Promise.all([
-        this.prisma.utilisateur.count(),
-        this.prisma.action.count(),
-        this.prisma.action.count({ where: { timestamp: { gte: startOfDay } } }),
-        this.prisma.action.count({ where: { syncStatus: 'SYNCED' } }),
-        this.prisma.action.count({
-          where: { syncStatus: { in: ['PENDING', 'SYNCING'] } },
+        this.utilisateurs.count(),
+        this.actions.count(),
+        this.actions.count({
+          where: { timestamp: MoreThanOrEqual(startOfDay) },
         }),
-        this.prisma.action.count({ where: { syncStatus: 'FAILED' } }),
-        this.prisma.recommendation.count(),
+        this.actions.count({ where: { syncStatus: SyncStatus.SYNCED } }),
+        this.actions.count({
+          where: [
+            { syncStatus: SyncStatus.PENDING },
+            { syncStatus: SyncStatus.SYNCING },
+          ],
+        }),
+        this.actions.count({ where: { syncStatus: SyncStatus.FAILED } }),
+        this.recommendations.count(),
       ]);
-
-    const syncRate = totalActions
-      ? Math.round((synced / totalActions) * 1000) / 10
-      : 100;
 
     return {
       totalUsers,
+      totalActions,
       actionsToday: today,
       actionsSynced: synced,
       actionsPending: pending,
       actionsFailed: failed,
-      totalActions,
       recommendations: recos,
-      syncRate,
+      syncRate: totalActions
+        ? Math.round((synced / totalActions) * 1000) / 10
+        : 100,
     };
   }
 
-  // Règles métier extensibles pour recommandations
-  private async triggerRecommendations(action: any) {
-    try {
-      // Exemple : si CREATE_PARCELLE → recommandation bienvenue
-      // Exemple : si actionType contient IRRIGATION et payload humidité basse → HIGH
-      // On garde simple et extensible : chaque règle est une fonction
+  private labelOf(value: unknown): string {
+    if (typeof value === 'string' && value.trim() !== '') return value.trim();
+    if (typeof value === 'number') return String(value);
+    return 'sans nom';
+  }
 
-      const rules: Array<(a: any) => Promise<void>> = [
-        async (a) => {
-          if (a.actionType === 'CREATE_PARCELLE') {
-            await this.prisma.recommendation.create({
-              data: {
-                userId: a.userId,
-                title: 'Bienvenue — première parcelle créée',
-                message: `Parcelle "${a.payload?.nom ?? a.entityId}" créée. Pensez à délimiter la zone GPS pour calculer la superficie.`,
-                type: 'SUCCESS',
-                priority: 'MEDIUM',
-                metadata: { actionId: a.id, entityType: a.entityType },
-              },
-            });
-          }
-        },
-        async (a) => {
-          if (
-            a.actionType === 'CREATE_OBSERVATION' &&
-            a.payload?.humidite != null &&
-            a.payload.humidite < 30
-          ) {
-            await this.prisma.recommendation.create({
-              data: {
-                userId: a.userId,
-                title: 'Irrigation recommandée',
-                message: `Humidité basse (${a.payload.humidite}%) détectée. Prévoir irrigation dans 24h.`,
-                type: 'WARNING',
-                priority: 'HIGH',
-                metadata: { actionId: a.id },
-              },
-            });
-          }
-        },
-      ];
-
-      for (const rule of rules) {
-        try {
-          await rule(action);
-        } catch (e) {
-          this.logger.warn(`rule failed: ${e}`);
+  // =========================================================
+  // RÈGLES DE RECOMMANDATION (extensibles)
+  // =========================================================
+  /**
+   * Chaque règle reçoit le contexte d'une action et peut générer une
+   * recommandation. Une règle qui échoue n'interrompt jamais la
+   * synchronisation.
+   */
+  async triggerRecommendationRules(context: {
+    userId: string;
+    actionType: string;
+    entityType: string;
+    payload: Record<string, unknown> | null;
+  }): Promise<void> {
+    const rules: Array<() => Promise<void>> = [
+      async () => {
+        if (context.actionType === 'CREATE_PARCELLE') {
+          await this.recommendations.save(
+            this.recommendations.create({
+              userId: context.userId,
+              title: 'Bienvenue — première parcelle créée',
+              message: `Parcelle « ${this.labelOf(
+                context.payload?.nom,
+              )} » créée. Pensez à délimiter la zone GPS pour calculer la superficie.`,
+              type: RecommendationType.SUCCESS,
+              priority: RecommendationPriority.MEDIUM,
+              metadata: { entityType: context.entityType },
+            }),
+          );
         }
+      },
+      async () => {
+        // Humidité basse → irrigation recommandée
+        const humidite = Number(context.payload?.humidite);
+        if (
+          context.actionType === 'CREATE_OBSERVATION' &&
+          Number.isFinite(humidite) &&
+          humidite < 30
+        ) {
+          await this.recommendations.save(
+            this.recommendations.create({
+              userId: context.userId,
+              title: 'Irrigation recommandée',
+              message: `Humidité basse (${humidite}%) détectée. Prévoir une irrigation dans les 24 heures.`,
+              type: RecommendationType.WARNING,
+              priority: RecommendationPriority.HIGH,
+              metadata: { entityType: context.entityType },
+            }),
+          );
+        }
+      },
+      async () => {
+        // Récolte enregistrée → confirmation
+        if (context.actionType === 'CREATE_RECOLTE') {
+          await this.recommendations.save(
+            this.recommendations.create({
+              userId: context.userId,
+              title: 'Récolte enregistrée',
+              message:
+                'Votre récolte a été enregistrée. La culture est désormais marquée comme récoltée.',
+              type: RecommendationType.SUCCESS,
+              priority: RecommendationPriority.LOW,
+              metadata: { entityType: context.entityType },
+            }),
+          );
+        }
+      },
+    ];
+
+    for (const rule of rules) {
+      try {
+        await rule();
+      } catch (error) {
+        this.logger.warn(`Règle de recommandation en échec: ${String(error)}`);
       }
-    } catch (e) {
-      this.logger.error('triggerRecommendations error', e);
     }
   }
 }

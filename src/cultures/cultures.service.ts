@@ -1,219 +1,102 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-
-import { PrismaService } from '../prisma/prisma.service';
-import { StatutCulture } from '@prisma/client';
-
+import { InjectRepository } from '@nestjs/typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
+import { Culture } from './entities/culture.entity';
+import { PointGPSCulture } from './entities/point-gps-culture.entity';
+import { Parcelle } from '../parcelles/entities/parcelle.entity';
+import { Recolte } from '../recoltes/entities/recolte.entity';
+import { StatutCulture, StatutParcelle } from '../common/enums/domain.enums';
 import { CreateCultureDto } from './dto/creation-culture.dto';
 import { UpdateCultureDto } from './dto/modification-culture.dto';
-
+import { calculerSuperficie } from '../common/utils/geo.util';
+import { statutCultureAJour } from '../common/utils/culture-statut.util';
+import type { PaginatedResult } from '../common/dto/pagination.dto';
+import { paginate } from '../common/dto/pagination.dto';
+/**
+ * Cycle de vie d'une culture — transitions autorisées.
+ * PLANIFIEE → EN_COURS (démarrage) | ABANDONNEE | SUPPRIMEE
+ * EN_COURS  → RECOLTEE (automatique lors de la création d'une récolte)
+ * ABANDONNEE→ PLANIFIEE | SUPPRIMEE
+ * RECOLTEE  → (terminal)
+ * SUPPRIMEE → (terminal)
+ */
+const TRANSITIONS_AUTORISEES: Record<StatutCulture, StatutCulture[]> = {
+  [StatutCulture.PLANIFIEE]: [
+    StatutCulture.EN_COURS,
+    StatutCulture.ABANDONNEE,
+    StatutCulture.SUPPRIMEE,
+  ],
+  [StatutCulture.EN_COURS]: [StatutCulture.RECOLTEE, StatutCulture.ABANDONNEE],
+  [StatutCulture.RECOLTEE]: [],
+  [StatutCulture.ABANDONNEE]: [
+    StatutCulture.PLANIFIEE,
+    StatutCulture.SUPPRIMEE,
+  ],
+  [StatutCulture.SUPPRIMEE]: [],
+};
 @Injectable()
 export class CulturesService {
-  constructor(private readonly prisma: PrismaService) {}
-
+  private readonly logger = new Logger(CulturesService.name);
+  constructor(
+    @InjectRepository(Culture)
+    private readonly cultures: Repository<Culture>,
+    @InjectRepository(PointGPSCulture)
+    private readonly points: Repository<PointGPSCulture>,
+    @InjectRepository(Recolte)
+    private readonly recoltes: Repository<Recolte>,
+  ) {}
   // =========================
-  // CRÉER UNE CULTURE
+  // OWNERSHIP
+  // =========================
+  async requireOwnership(
+    cultureId: string,
+    utilisateurId: string,
+    options: { parcelleId?: string; includeDeleted?: boolean } = {},
+  ): Promise<Culture> {
+    const culture = await this.cultures.findOne({
+      where: {
+        id: cultureId,
+        ...(options.parcelleId ? { parcelleId: options.parcelleId } : {}),
+        parcelle: { utilisateurId },
+      },
+      relations: { parcelle: true },
+    });
+    if (!culture) {
+      throw new NotFoundException('Culture introuvable');
+    }
+    if (!options.includeDeleted && culture.statut === StatutCulture.SUPPRIMEE) {
+      throw new NotFoundException('Culture introuvable');
+    }
+    return culture;
+  }
+  // =========================
+  // CREATE
   // =========================
   async create(
     parcelleId: string,
     dto: CreateCultureDto,
     utilisateurId: string,
   ) {
-    const parcelle = await this.prisma.parcelle.findFirst({
-      where: {
-        id: parcelleId,
-        utilisateurId,
-      },
+    const parcelle = await this.cultures.manager.findOne(Parcelle, {
+      where: { id: parcelleId, utilisateurId },
     });
-
     if (!parcelle) {
       throw new NotFoundException('Parcelle introuvable');
     }
-
-    // Une parcelle supprimée ne peut plus recevoir
-    // de nouvelle culture
-    if (parcelle.statut === 'SUPPRIMEE') {
+    if (parcelle.statut === StatutParcelle.SUPPRIMEE) {
       throw new BadRequestException(
         'Impossible d’ajouter une culture sur une parcelle supprimée',
       );
     }
-
-    // Vérification des dates
-    if (
-      dto.datePlantation &&
-      dto.datePrevueRecolte &&
-      new Date(dto.datePrevueRecolte) < new Date(dto.datePlantation)
-    ) {
-      throw new BadRequestException(
-        'La date prévue de récolte doit être après la date de plantation',
-      );
-    }
-
-    return this.prisma.culture.create({
-      data: {
-        nom: dto.nom,
-        type: dto.type,
-        variete: dto.variete,
-
-        datePlantation: dto.datePlantation
-          ? new Date(dto.datePlantation)
-          : undefined,
-
-        datePrevueRecolte: dto.datePrevueRecolte
-          ? new Date(dto.datePrevueRecolte)
-          : undefined,
-
-        description: dto.description,
-        stade: dto.stade,
-
-        // PLANIFIEE par défaut si aucun statut n'est fourni
-        statut: dto.statut ?? StatutCulture.PLANIFIEE,
-
-        parcelleId,
-      },
-    });
-  }
-
-  // =========================
-  // RÉCUPÉRER LES CULTURES
-  // =========================
-  async findAll(parcelleId: string, utilisateurId: string) {
-    const parcelle = await this.prisma.parcelle.findFirst({
-      where: {
-        id: parcelleId,
-        utilisateurId,
-      },
-    });
-
-    if (!parcelle) {
-      throw new NotFoundException('Parcelle introuvable');
-    }
-
-    return this.prisma.culture.findMany({
-      where: {
-        parcelleId,
-      },
-      orderBy: {
-        creeA: 'desc',
-      },
-    });
-  }
-
-  // =========================
-  // RÉCUPÉRER UNE CULTURE
-  // =========================
-  async findOne(parcelleId: string, id: string, utilisateurId: string) {
-    const culture = await this.prisma.culture.findFirst({
-      where: {
-        id,
-        parcelleId,
-        parcelle: {
-          utilisateurId,
-        },
-      },
-    });
-
-    if (!culture) {
-      throw new NotFoundException('Culture introuvable');
-    }
-
-    return culture;
-  }
-
-  // =========================
-  // VÉRIFIER LA TRANSITION
-  // DE STATUT
-  // =========================
-  private verifierTransitionStatut(
-    actuel: StatutCulture,
-    nouveau: StatutCulture,
-  ) {
-    if (actuel === nouveau) {
-      throw new BadRequestException(`La culture est déjà au statut ${actuel}`);
-    }
-
-    const transitionsAutorisees: Record<StatutCulture, StatutCulture[]> = {
-      // PLANIFIEE peut aller vers tous les autres statuts
-      PLANIFIEE: [
-        StatutCulture.EN_COURS,
-        StatutCulture.ABANDONNEE,
-        StatutCulture.SUPPRIMEE,
-      ],
-
-      // EN_COURS peut uniquement être récoltée
-      EN_COURS: [StatutCulture.RECOLTEE],
-
-      // Une culture récoltée ne peut plus changer
-      RECOLTEE: [],
-
-      // Une culture abandonnée peut être replanifiée
-      // ou supprimée
-      ABANDONNEE: [StatutCulture.PLANIFIEE, StatutCulture.SUPPRIMEE],
-
-      // Une culture supprimée ne peut plus être modifiée
-      SUPPRIMEE: [],
-    };
-
-    if (!transitionsAutorisees[actuel].includes(nouveau)) {
-      throw new BadRequestException(
-        `Transition de statut impossible : ${actuel} → ${nouveau}`,
-      );
-    }
-  }
-
-  // =========================
-  // MODIFIER UNE CULTURE
-  // =========================
-  async update(
-    parcelleId: string,
-    id: string,
-    dto: UpdateCultureDto,
-    utilisateurId: string,
-  ) {
-    const culture = await this.prisma.culture.findFirst({
-      where: {
-        id,
-        parcelleId,
-        parcelle: {
-          utilisateurId,
-        },
-      },
-    });
-
-    if (!culture) {
-      throw new NotFoundException('Culture introuvable');
-    }
-
-    // Une culture récoltée ou supprimée ne peut plus être modifiée
-    if (
-      culture.statut === StatutCulture.RECOLTEE ||
-      culture.statut === StatutCulture.SUPPRIMEE
-    ) {
-      throw new BadRequestException(
-        'Impossible de modifier une culture récoltée ou supprimée',
-      );
-    }
-
-    // Vérification du changement de statut
-    if (dto.statut !== undefined) {
-      this.verifierTransitionStatut(culture.statut, dto.statut);
-    }
-
-    // Calcul des dates finales
-    const datePlantation =
-      dto.datePlantation !== undefined
-        ? new Date(dto.datePlantation)
-        : culture.datePlantation;
-
-    const datePrevueRecolte =
-      dto.datePrevueRecolte !== undefined
-        ? new Date(dto.datePrevueRecolte)
-        : culture.datePrevueRecolte;
-
-    // Vérification des dates
+    // Valeurs calendaires : conservées telles quelles (`YYYY-MM-DD`).
+    // Aucune conversion en Date n'est faite ici → aucun décalage possible.
+    const datePlantation = dto.datePlantation ?? null;
+    const datePrevueRecolte = dto.datePrevueRecolte ?? null;
     if (
       datePlantation &&
       datePrevueRecolte &&
@@ -223,54 +106,160 @@ export class CulturesService {
         'La date prévue de récolte doit être après la date de plantation',
       );
     }
-
-    return this.prisma.culture.update({
-      where: {
-        id,
-      },
-
-      data: {
-        ...(dto.nom !== undefined && {
-          nom: dto.nom,
-        }),
-
-        ...(dto.type !== undefined && {
-          type: dto.type,
-        }),
-
-        ...(dto.variete !== undefined && {
-          variete: dto.variete,
-        }),
-
-        ...(dto.datePlantation !== undefined && {
-          datePlantation: dto.datePlantation
-            ? new Date(dto.datePlantation)
-            : null,
-        }),
-
-        ...(dto.datePrevueRecolte !== undefined && {
-          datePrevueRecolte: dto.datePrevueRecolte
-            ? new Date(dto.datePrevueRecolte)
-            : null,
-        }),
-
-        ...(dto.description !== undefined && {
-          description: dto.description,
-        }),
-
-        ...(dto.stade !== undefined && {
-          stade: dto.stade,
-        }),
-
-        ...(dto.statut !== undefined && {
-          statut: dto.statut,
-        }),
-      },
+    const culture = this.cultures.create({
+      nom: dto.nom.trim(),
+      type: dto.type?.trim() ?? null,
+      variete: dto.variete?.trim() ?? null,
+      description: dto.description?.trim() ?? null,
+      stade: dto.stade?.trim() ?? null,
+      datePlantation,
+      datePrevueRecolte,
+      statut: dto.statut ?? StatutCulture.PLANIFIEE,
+      parcelleId,
     });
+    const saved = await this.cultures.save(culture);
+    if (dto.pointsGPS && dto.pointsGPS.length >= 3) {
+      await this.savePointsGPS(
+        parcelleId,
+        saved.id,
+        utilisateurId,
+        dto.pointsGPS,
+      );
+    }
+    this.logger.log(`[create] culture ${saved.id} sur parcelle ${parcelleId}`);
+    return this.reconcilierStatut(
+      await this.cultures.findOne({ where: { id: saved.id } }),
+    );
   }
-
   // =========================
-  // SUPPRESSION LOGIQUE
+  // READ
+  // =========================
+  async findAll(
+    parcelleId: string,
+    utilisateurId: string,
+    page = 1,
+    limit = 50,
+  ): Promise<PaginatedResult<Culture>> {
+    const parcelle = await this.cultures.manager.findOne(Parcelle, {
+      where: { id: parcelleId, utilisateurId },
+    });
+    if (!parcelle) {
+      throw new NotFoundException('Parcelle introuvable');
+    }
+    const [items, total] = await this.cultures.findAndCount({
+      where: { parcelleId },
+      relations: { recolte: true },
+      order: { creeA: 'DESC' },
+      skip: (Math.max(1, page) - 1) * Math.min(200, Math.max(1, limit)),
+      take: Math.min(200, Math.max(1, limit)),
+    });
+    return paginate(await this.reconcilierStatuts(items), total, page, limit);
+  }
+  /** Toutes les cultures de l'utilisateur (écrans « historique », « récoltes »). */
+  async findAllForUser(
+    utilisateurId: string,
+    page = 1,
+    limit = 50,
+    statut?: StatutCulture,
+  ): Promise<PaginatedResult<Culture>> {
+    const [items, total] = await this.cultures.findAndCount({
+      where: {
+        parcelle: { utilisateurId },
+        ...(statut ? { statut } : {}),
+      },
+      relations: { parcelle: true, recolte: true },
+      order: { creeA: 'DESC' },
+      skip: (Math.max(1, page) - 1) * Math.min(200, Math.max(1, limit)),
+      take: Math.min(200, Math.max(1, limit)),
+    });
+    return paginate(await this.reconcilierStatuts(items), total, page, limit);
+  }
+  /** `parcelleId` facultatif : la route plate `/cultures/:id` l'omet. */
+  async findOne(
+    parcelleId: string | undefined,
+    id: string,
+    utilisateurId: string,
+  ) {
+    const culture = await this.requireOwnership(id, utilisateurId, {
+      parcelleId,
+      includeDeleted: true,
+    });
+    const [pointsGPS, recolte] = await Promise.all([
+      this.points.find({ where: { cultureId: id }, order: { ordre: 'ASC' } }),
+      this.recoltes.findOne({
+        where: { cultureId: id },
+        relations: { photos: true },
+      }),
+    ]);
+    return {
+      ...(await this.reconcilierStatut(culture)),
+      pointsGPS,
+      recolte,
+    };
+  }
+  // =========================
+  // UPDATE
+  // =========================
+  async update(
+    parcelleId: string,
+    id: string,
+    dto: UpdateCultureDto,
+    utilisateurId: string,
+  ) {
+    const culture = await this.requireOwnership(id, utilisateurId, {
+      parcelleId,
+      includeDeleted: true,
+    });
+    if (
+      culture.statut === StatutCulture.RECOLTEE ||
+      culture.statut === StatutCulture.SUPPRIMEE
+    ) {
+      throw new BadRequestException(
+        'Impossible de modifier une culture récoltée ou supprimée',
+      );
+    }
+    if (dto.statut !== undefined && dto.statut !== culture.statut) {
+      this.verifierTransitionStatut(culture.statut, dto.statut);
+    }
+    const datePlantation =
+      dto.datePlantation !== undefined
+        ? dto.datePlantation
+        : culture.datePlantation;
+    const datePrevueRecolte =
+      dto.datePrevueRecolte !== undefined
+        ? dto.datePrevueRecolte
+        : culture.datePrevueRecolte;
+    if (
+      datePlantation &&
+      datePrevueRecolte &&
+      datePrevueRecolte < datePlantation
+    ) {
+      throw new BadRequestException(
+        'La date prévue de récolte doit être après la date de plantation',
+      );
+    }
+    Object.assign(culture, {
+      ...(dto.nom !== undefined && { nom: dto.nom.trim() }),
+      ...(dto.type !== undefined && { type: dto.type?.trim() ?? null }),
+      ...(dto.variete !== undefined && {
+        variete: dto.variete?.trim() ?? null,
+      }),
+      ...(dto.description !== undefined && {
+        description: dto.description?.trim() ?? null,
+      }),
+      ...(dto.stade !== undefined && { stade: dto.stade?.trim() ?? null }),
+      ...(dto.datePlantation !== undefined && { datePlantation }),
+      ...(dto.datePrevueRecolte !== undefined && { datePrevueRecolte }),
+      ...(dto.statut !== undefined && { statut: dto.statut }),
+    });
+    await this.cultures.save(culture);
+    if (dto.pointsGPS && dto.pointsGPS.length >= 3) {
+      await this.savePointsGPS(parcelleId, id, utilisateurId, dto.pointsGPS);
+    }
+    return this.findOne(parcelleId, id, utilisateurId);
+  }
+  // =========================
+  // DELETE (logique)
   // =========================
   async remove(
     parcelleId: string,
@@ -278,233 +267,158 @@ export class CulturesService {
     utilisateurId: string,
     raison?: string,
   ) {
-    const culture = await this.prisma.culture.findFirst({
-      where: {
-        id,
-        parcelleId,
-        parcelle: {
-          utilisateurId,
-        },
-      },
+    const culture = await this.requireOwnership(id, utilisateurId, {
+      parcelleId,
+      includeDeleted: true,
     });
-
-    if (!culture) {
-      throw new NotFoundException('Culture introuvable');
-    }
-
-    // Empêcher une deuxième suppression
     if (culture.statut === StatutCulture.SUPPRIMEE) {
       throw new BadRequestException('Cette culture est déjà supprimée');
     }
-
-    return this.prisma.culture.update({
-      where: {
-        id,
-      },
-
-      data: {
-        statut: StatutCulture.SUPPRIMEE,
-        raisonSuppression: raison,
-      },
-    });
+    culture.statut = StatutCulture.SUPPRIMEE;
+    culture.raisonSuppression = raison?.trim() ?? null;
+    await this.cultures.save(culture);
+    return culture;
   }
   // =========================
-  // RÉCUPÉRER LES POINTS GPS
-  // D'UNE CULTURE
+  // POINTS GPS DE LA CULTURE
   // =========================
   async findPointsGPS(
     parcelleId: string,
     cultureId: string,
     utilisateurId: string,
   ) {
-    const culture = await this.prisma.culture.findFirst({
-      where: {
-        id: cultureId,
-        parcelleId,
-        parcelle: {
-          utilisateurId,
-        },
-      },
-    });
-
-    if (!culture) {
-      throw new NotFoundException('Culture introuvable');
-    }
-
-    return this.prisma.pointGPSCulture.findMany({
-      where: {
-        cultureId,
-      },
-      orderBy: {
-        ordre: 'asc',
-      },
-    });
+    await this.requireOwnership(cultureId, utilisateurId, { parcelleId });
+    return this.points.find({ where: { cultureId }, order: { ordre: 'ASC' } });
   }
-
-  // =========================
-  // ENREGISTRER LES POINTS GPS
-  // D'UNE CULTURE
-  // =========================
   async savePointsGPS(
     parcelleId: string,
     cultureId: string,
     utilisateurId: string,
-    points: {
-      latitude: number;
-      longitude: number;
-      ordre: number;
-    }[],
+    points: { latitude: number; longitude: number; ordre: number }[],
   ) {
-    const culture = await this.prisma.culture.findFirst({
-      where: {
-        id: cultureId,
-        parcelleId,
-        parcelle: {
-          utilisateurId,
-        },
-      },
+    await this.requireOwnership(cultureId, utilisateurId, {
+      parcelleId,
+      includeDeleted: true,
     });
-
-    if (!culture) {
-      throw new NotFoundException('Culture introuvable');
-    }
-
-    // Une culture récoltée ou supprimée ne peut plus être tracée
-    if (
-      culture.statut === StatutCulture.RECOLTEE ||
-      culture.statut === StatutCulture.SUPPRIMEE
-    ) {
+    if (points.length !== 0 && points.length < 3) {
       throw new BadRequestException(
-        'Impossible de modifier le tracé d’une culture récoltée ou supprimée',
+        'Une délimitation doit comporter au moins 3 points GPS.',
       );
     }
+    return this.cultures.manager.transaction(async (manager) => {
+      await manager.delete(PointGPSCulture, { cultureId });
+      if (points.length === 0) {
+        return [];
+      }
+      return manager.save(
+        points.map((point) =>
+          manager.create(PointGPSCulture, {
+            cultureId,
+            latitude: point.latitude,
+            longitude: point.longitude,
+            ordre: point.ordre,
+          }),
+        ),
+      );
+    });
+  }
+  /** Superficie délimitée d'une culture (m²) — utilisée par le mobile. */
+  async superficieCulture(cultureId: string): Promise<number | null> {
+    const points = await this.points.find({
+      where: { cultureId },
+      order: { ordre: 'ASC' },
+    });
+    if (points.length < 3) return null;
+    return calculerSuperficie(points);
+  }
+  // =========================
+  // CYCLE DE VIE
+  // =========================
+  /**
+   * Applique la règle « date de plantation atteinte → culture en cours ».
+   *
+   * Appelée à la création et à chaque lecture : le statut renvoyé au mobile est
+   * donc toujours cohérent avec la date, sans que le client ait à le calculer.
+   * L'écriture n'a lieu que si le statut change réellement.
+   */
+  private async reconcilierStatut<T extends Culture | null | undefined>(
+    culture: T,
+  ): Promise<T> {
+    if (!culture) return culture;
 
-    // Au minimum 3 points pour former une zone
-    if (points.length < 3) {
+    const statut = statutCultureAJour(culture.statut, culture.datePlantation);
+
+    if (statut === culture.statut) return culture;
+
+    culture.statut = statut;
+    await this.cultures.update({ id: culture.id }, { statut });
+    this.logger.log(
+      `[statut] culture ${culture.id} → ${statut} (date de plantation atteinte)`,
+    );
+
+    return culture;
+  }
+
+  /** Version « lot » : une seule requête de mise à jour pour toute la page. */
+  private async reconcilierStatuts(items: Culture[]): Promise<Culture[]> {
+    const aBasculer = items.filter(
+      (culture) =>
+        statutCultureAJour(culture.statut, culture.datePlantation) !==
+        culture.statut,
+    );
+
+    if (aBasculer.length === 0) return items;
+
+    await this.cultures.update(
+      { id: In(aBasculer.map((culture) => culture.id)) },
+      { statut: StatutCulture.EN_COURS },
+    );
+    aBasculer.forEach((culture) => {
+      culture.statut = StatutCulture.EN_COURS;
+    });
+    this.logger.log(
+      `[statut] ${aBasculer.length} culture(s) → EN_COURS (date de plantation atteinte)`,
+    );
+
+    return items;
+  }
+
+  // =========================
+  // TRANSITIONS
+  // =========================
+  private verifierTransitionStatut(
+    actuel: StatutCulture,
+    nouveau: StatutCulture,
+  ): void {
+    if (actuel === nouveau) {
+      throw new BadRequestException(`La culture est déjà au statut ${actuel}`);
+    }
+    if (!TRANSITIONS_AUTORISEES[actuel].includes(nouveau)) {
       throw new BadRequestException(
-        'Une culture doit avoir au moins 3 points GPS',
+        `Transition de statut impossible : ${actuel} → ${nouveau}`,
       );
     }
-
-    // =====================================================
-    // RÉCUPÉRER UNIQUEMENT LES CULTURES QUI OCCUPENT
-    // ACTUELLEMENT UNE ZONE
-    //
-    // RECOLTEE   => disponible
-    // ABANDONNEE => disponible
-    // SUPPRIMEE  => disponible
-    //
-    // PLANIFIEE + EN_COURS => zone occupée
-    // =====================================================
-
-    const culturesActives = await this.prisma.culture.findMany({
-      where: {
-        parcelleId,
-
-        // Ne prendre que les cultures qui occupent
-        // actuellement une partie de la parcelle
-        statut: {
-          in: [StatutCulture.PLANIFIEE, StatutCulture.EN_COURS],
-        },
-
-        // Ne pas comparer la culture avec elle-même
-        id: {
-          not: cultureId,
-        },
-      },
-
-      include: {
-        pointsGPS: {
-          orderBy: {
-            ordre: 'asc',
-          },
-        },
-      },
-    });
-    // eslint-disable-next-line no-console
-    console.log('CULTURES ACTIVES:', culturesActives);
-
-    // Vérifie si un point est à l'intérieur d'un polygone
-    const pointDansPolygone = (
-      latitude: number,
-      longitude: number,
-      polygone: {
-        latitude: number;
-        longitude: number;
-      }[],
-    ): boolean => {
-      let dedans = false;
-
-      for (let i = 0, j = polygone.length - 1; i < polygone.length; j = i++) {
-        const xi = polygone[i].longitude;
-        const yi = polygone[i].latitude;
-
-        const xj = polygone[j].longitude;
-        const yj = polygone[j].latitude;
-
-        const intersecte =
-          yi > latitude !== yj > latitude &&
-          longitude < ((xj - xi) * (latitude - yi)) / (yj - yi) + xi;
-
-        if (intersecte) {
-          dedans = !dedans;
-        }
-      }
-
-      return dedans;
-    };
-
-    // Vérifier si la nouvelle zone entre dans une zone active
-    for (const cultureActive of culturesActives) {
-      const zoneActive = cultureActive.pointsGPS;
-
-      if (zoneActive.length < 3) {
-        continue;
-      }
-
-      const chevauchement = points.some((point) =>
-        pointDansPolygone(point.latitude, point.longitude, zoneActive),
+  }
+  /** Exposé pour les autres modules (récoltes, sync). */
+  static verifierTransition(
+    actuel: StatutCulture,
+    nouveau: StatutCulture,
+  ): void {
+    if (!TRANSITIONS_AUTORISEES[actuel].includes(nouveau)) {
+      throw new BadRequestException(
+        `Transition de statut impossible : ${actuel} → ${nouveau}`,
       );
-
-      if (chevauchement) {
-        throw new BadRequestException(
-          `La zone de la culture "${cultureActive.nom}" chevauche la zone d'une culture ${cultureActive.statut}.`,
-        );
-      }
     }
-    // =====================================================
-    // POUR L'INSTANT :
-    // on prépare les zones actives.
-    //
-    // Les cultures RECOLTEE ne sont PAS récupérées ici,
-    // donc leurs anciennes zones GPS ne bloquent plus
-    // une nouvelle culture.
-    // =====================================================
-
-    // Supprimer l'ancien tracé
-    await this.prisma.pointGPSCulture.deleteMany({
-      where: {
-        cultureId,
-      },
-    });
-
-    // Enregistrer le nouveau tracé
-    await this.prisma.pointGPSCulture.createMany({
-      data: points.map((point) => ({
-        latitude: point.latitude,
-        longitude: point.longitude,
-        ordre: point.ordre,
-        cultureId,
-      })),
-    });
-
-    return this.prisma.pointGPSCulture.findMany({
-      where: {
-        cultureId,
-      },
-      orderBy: {
-        ordre: 'asc',
-      },
-    });
+  }
+  /** Marque une culture comme récoltée (utilisé dans une transaction). */
+  async markAsRecoltee(
+    manager: EntityManager,
+    cultureId: string,
+  ): Promise<void> {
+    await manager.update(
+      Culture,
+      { id: cultureId },
+      { statut: StatutCulture.RECOLTEE },
+    );
   }
 }

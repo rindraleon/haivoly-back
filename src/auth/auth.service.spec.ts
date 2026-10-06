@@ -1,18 +1,184 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { AuthService } from './auth.service';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
 
-describe('AuthService', () => {
+import { AuthService } from './auth.service';
+import { createMockRepo } from '../test-utils/repo.mock';
+import { MailService } from './mail.service';
+import { Utilisateur } from '../users/entities/utilisateur.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
+import { Role } from '../common/enums/domain.enums';
+
+describe('AuthService — sécurité', () => {
   let service: AuthService;
+  let utilisateurs: ReturnType<typeof createMockRepo>;
+  let resetTokens: ReturnType<typeof createMockRepo>;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthService],
+    utilisateurs = createMockRepo();
+    resetTokens = createMockRepo();
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(Utilisateur), useValue: utilisateurs },
+        {
+          provide: getRepositoryToken(PasswordResetToken),
+          useValue: resetTokens,
+        },
+        {
+          provide: JwtService,
+          useValue: { signAsync: jest.fn(async () => 'jwt-token') },
+        },
+        {
+          provide: MailService,
+          useValue: {
+            sendPasswordResetEmail: jest.fn(),
+            buildResetUrl: jest.fn(() => 'exp://haivoly/reset'),
+          },
+        },
+      ],
     }).compile();
 
-    service = module.get<AuthService>(AuthService);
+    service = moduleRef.get(AuthService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('rejette un email déjà utilisé', async () => {
+    utilisateurs.findOne.mockResolvedValue({ id: 'u1' });
+    await expect(
+      service.register({ nom: 'A', email: 'a@b.mg', password: 'MotDePasse1' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('hache le mot de passe et ne renvoie jamais le hash', async () => {
+    utilisateurs.findOne.mockResolvedValue(null);
+
+    const result = await service.register({
+      nom: 'Rindra',
+      email: 'Rindra@Haivoly.MG',
+      password: 'MotDePasse1',
+    });
+
+    const saved = utilisateurs.save.mock.calls[0][0] as {
+      password: string;
+      email: string;
+    };
+    expect(saved.password).not.toBe('MotDePasse1');
+    expect(await bcrypt.compare('MotDePasse1', saved.password)).toBe(true);
+    expect(saved.email).toBe('rindra@haivoly.mg'); // normalisé
+    expect(
+      (result as unknown as { password?: string }).password,
+    ).toBeUndefined();
+  });
+
+  it('refuse un mot de passe incorrect sans révéler si l’email existe', async () => {
+    utilisateurs.findOne.mockResolvedValue({
+      id: 'u1',
+      email: 'a@b.mg',
+      password: await bcrypt.hash('BonMotDePasse', 10),
+      role: Role.AGRICULTEUR,
+    });
+
+    await expect(
+      service.login({ email: 'a@b.mg', password: 'mauvais' }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('délivre un token et un profil sans mot de passe', async () => {
+    utilisateurs.findOne.mockResolvedValue({
+      id: 'u1',
+      nom: 'Rindra',
+      prenom: null,
+      email: 'a@b.mg',
+      telephone: null,
+      role: Role.AGRICULTEUR,
+      password: await bcrypt.hash('BonMotDePasse', 10),
+      creeA: new Date(),
+    });
+
+    const result = await service.login({
+      email: 'a@b.mg',
+      password: 'BonMotDePasse',
+    });
+
+    expect(result.access_token).toBe('jwt-token');
+    expect(result.utilisateur).not.toHaveProperty('password');
+  });
+
+  it('forgot-password renvoie la même réponse pour un email inconnu (anti-énumération)', async () => {
+    utilisateurs.findOne.mockResolvedValue(null);
+
+    const result = await service.forgotPassword('inconnu@haivoly.mg');
+
+    expect(result.message).toContain('Si un compte est associé');
+    expect(resetTokens.save).not.toHaveBeenCalled();
+  });
+
+  it('forgot-password invalide les anciens tokens puis en crée un nouveau', async () => {
+    utilisateurs.findOne.mockResolvedValue({ id: 'u1', email: 'a@b.mg' });
+
+    await service.forgotPassword('a@b.mg');
+
+    expect(resetTokens.update).toHaveBeenCalledWith(
+      { email: 'a@b.mg', used: false },
+      { used: true },
+    );
+    expect(resetTokens.save).toHaveBeenCalled();
+  });
+
+  it('rejette un token de réinitialisation inconnu', async () => {
+    resetTokens.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.resetPassword('token-inconnu', 'NouveauPass1', 'NouveauPass1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejette un token déjà utilisé', async () => {
+    resetTokens.findOne.mockResolvedValue({
+      used: true,
+      expiresAt: new Date(Date.now() + 1000),
+    });
+
+    await expect(
+      service.resetPassword('token', 'NouveauPass1', 'NouveauPass1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejette un token expiré', async () => {
+    resetTokens.findOne.mockResolvedValue({
+      used: false,
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    await expect(
+      service.resetPassword('token', 'NouveauPass1', 'NouveauPass1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejette des mots de passe non identiques', async () => {
+    await expect(
+      service.resetPassword('token', 'NouveauPass1', 'AutrePass1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('stocke uniquement le hash SHA-256 du token', async () => {
+    utilisateurs.findOne.mockResolvedValue({ id: 'u1', email: 'a@b.mg' });
+
+    const result = await service.forgotPassword('a@b.mg');
+    const rawToken = (result as { _devToken?: string })._devToken;
+    const storedToken = resetTokens.save.mock.calls[0][0] as {
+      tokenHash: string;
+    };
+
+    expect(rawToken).toBeDefined();
+    expect(storedToken.tokenHash).not.toBe(rawToken);
+    expect(storedToken.tokenHash).toHaveLength(64); // sha256 hex
   });
 });

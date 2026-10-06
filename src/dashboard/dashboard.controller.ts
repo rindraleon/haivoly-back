@@ -1,15 +1,19 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
 
 @Controller('dashboard')
+@UseGuards(JwtAuthGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Get()
-  async getDashboard(@Req() req: any) {
-    return this.dashboardService.getDashboard(req.user.sub);
+  getDashboard(@CurrentUser() user: AuthenticatedUser) {
+    // Correction : l'identifiant provient de la stratégie JWT (`user.id`),
+    // et non de `user.sub` qui n'existe pas → les compteurs étaient faux.
+    return this.dashboardService.getDashboard(user.id);
   }
 }

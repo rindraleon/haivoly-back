@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -7,70 +6,58 @@ import {
   Param,
   Patch,
   Post,
-  Request,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 
 import { RecoltesService } from './recoltes.service';
-import { CreateRecolteDto } from './dto/creation-recolte.dto';
-import { UpdateRecolteDto } from './dto/modification-recolte.dto';
+import { CreateRecolteDto, UpdateRecolteDto } from './dto/recolte.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class RecoltesController {
   constructor(private readonly recoltesService: RecoltesService) {}
 
-  // =========================
-  // LISTE DE TOUTES LES RÉCOLTES
-  // =========================
-
   @Get('recoltes')
-  async findAll(@Request() req: any) {
-    return this.recoltesService.findAll(req.user.id);
+  findAll(
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.recoltesService.findAll(user.id, query.page, query.limit ?? 50);
   }
-
-  // =========================
-  // CRÉER UNE RÉCOLTE
-  // =========================
 
   @Post('cultures/:cultureId/recolte')
-  async create(
+  create(
     @Param('cultureId') cultureId: string,
     @Body() dto: CreateRecolteDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.recoltesService.create(cultureId, dto, req.user.id);
+    return this.recoltesService.create(cultureId, dto, user.id);
   }
-
-  // =========================
-  // RÉCUPÉRER LA RÉCOLTE D'UNE CULTURE
-  // =========================
 
   @Get('cultures/:cultureId/recolte')
-  async findOne(@Param('cultureId') cultureId: string, @Request() req: any) {
-    return this.recoltesService.findOne(cultureId, req.user.id);
+  findOne(
+    @Param('cultureId') cultureId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.recoltesService.findOne(cultureId, user.id);
   }
-
-  // =========================
-  // MODIFIER UNE RÉCOLTE
-  // =========================
 
   @Patch('recoltes/:id')
-  async update(
+  update(
     @Param('id') id: string,
     @Body() dto: UpdateRecolteDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.recoltesService.update(id, dto, req.user.id);
+    return this.recoltesService.update(id, dto, user.id);
   }
 
-  // =========================
-  // SUPPRIMER UNE RÉCOLTE
-  // =========================
-
   @Delete('recoltes/:id')
-  async remove(@Param('id') id: string, @Request() req: any) {
-    return this.recoltesService.remove(id, req.user.id);
+  remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.recoltesService.remove(id, user.id);
   }
 }

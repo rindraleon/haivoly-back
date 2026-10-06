@@ -3,156 +3,112 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import { PrismaService } from '../prisma/prisma.service';
-
-import { CreatePhotoRecolteDto } from './dto/creation-photo-recolte.dto';
-import { UpdatePhotoRecolteDto } from './dto/modification-photo-recolte.dto';
+import { PhotoRecolte } from './entities/photo-recolte.entity';
+import { Recolte } from '../recoltes/entities/recolte.entity';
+import { StatutCulture } from '../common/enums/domain.enums';
+import { normalizeUploadUrl } from '../common/utils/upload.util';
 
 @Injectable()
 export class PhotosRecoltesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(PhotoRecolte)
+    private readonly photos: Repository<PhotoRecolte>,
+    @InjectRepository(Recolte)
+    private readonly recoltes: Repository<Recolte>,
+  ) {}
 
-  // =========================
-  // VÉRIFIER LA RÉCOLTE
-  // =========================
-  private async verifierRecolte(recolteId: string, utilisateurId: string) {
-    const recolte = await this.prisma.recolte.findFirst({
-      where: {
-        id: recolteId,
-        culture: {
-          parcelle: {
-            utilisateurId,
-          },
-        },
-      },
-      include: {
-        culture: true,
-      },
+  private async requireRecolte(
+    recolteId: string,
+    utilisateurId: string,
+  ): Promise<Recolte> {
+    const recolte = await this.recoltes.findOne({
+      where: { id: recolteId, culture: { parcelle: { utilisateurId } } },
+      relations: { culture: true },
     });
 
     if (!recolte) {
       throw new NotFoundException('Récolte introuvable');
     }
 
-    if (recolte.culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException('Culture introuvable');
-    }
-
-    if (recolte.culture.statut !== 'RECOLTEE') {
-      throw new BadRequestException(
-        'La culture doit être récoltée pour gérer les photos de récolte',
-      );
-    }
-
     return recolte;
   }
 
-  // =========================
-  // AJOUTER UNE PHOTO
-  // =========================
-  async create(
-    recolteId: string,
-    dto: CreatePhotoRecolteDto,
-    utilisateurId: string,
-  ) {
-    await this.verifierRecolte(recolteId, utilisateurId);
-
-    return this.prisma.photoRecolte.create({
-      data: {
-        url: dto.url,
-        recolteId,
-      },
-    });
+  private assertRecoltee(recolte: Recolte): void {
+    if (recolte.culture?.statut !== StatutCulture.RECOLTEE) {
+      throw new BadRequestException(
+        'La culture doit être récoltée pour ajouter une photo',
+      );
+    }
   }
 
-  // =========================
-  // UPLOADER UNE PHOTO
-  // =========================
-  async upload(recolteId: string, utilisateurId: string, url: string) {
-    await this.verifierRecolte(recolteId, utilisateurId);
+  async create(recolteId: string, dto: { url: string }, utilisateurId: string) {
+    const recolte = await this.requireRecolte(recolteId, utilisateurId);
+    this.assertRecoltee(recolte);
 
-    return this.prisma.photoRecolte.create({
-      data: {
-        url,
+    return this.photos.save(
+      this.photos.create({
+        url: normalizeUploadUrl(dto.url, 'recoltes'),
         recolteId,
-      },
-    });
+      }),
+    );
   }
 
-  // =========================
-  // RÉCUPÉRER LES PHOTOS
-  // =========================
+  async upload(recolteId: string, utilisateurId: string, relativeUrl: string) {
+    const recolte = await this.requireRecolte(recolteId, utilisateurId);
+    this.assertRecoltee(recolte);
+
+    return this.photos.save(
+      this.photos.create({ url: relativeUrl, recolteId }),
+    );
+  }
+
   async findAll(recolteId: string, utilisateurId: string) {
-    await this.verifierRecolte(recolteId, utilisateurId);
-
-    return this.prisma.photoRecolte.findMany({
-      where: {
-        recolteId,
-      },
-      orderBy: {
-        dateAjout: 'desc',
-      },
+    await this.requireRecolte(recolteId, utilisateurId);
+    return this.photos.find({
+      where: { recolteId },
+      order: { dateAjout: 'DESC' },
     });
   }
 
-  // =========================
-  // RÉCUPÉRER UNE PHOTO
-  // =========================
   async findOne(recolteId: string, id: string, utilisateurId: string) {
-    await this.verifierRecolte(recolteId, utilisateurId);
+    await this.requireRecolte(recolteId, utilisateurId);
 
-    const photo = await this.prisma.photoRecolte.findFirst({
-      where: {
-        id,
-        recolteId,
-      },
-    });
-
+    const photo = await this.photos.findOne({ where: { id, recolteId } });
     if (!photo) {
-      throw new NotFoundException('Photo de récolte introuvable');
+      throw new NotFoundException('Photo introuvable');
     }
 
     return photo;
   }
 
-  // =========================
-  // MODIFIER UNE PHOTO
-  // =========================
   async update(
     recolteId: string,
     id: string,
-    dto: UpdatePhotoRecolteDto,
+    dto: { url?: string },
     utilisateurId: string,
   ) {
-    await this.verifierRecolte(recolteId, utilisateurId);
+    const recolte = await this.requireRecolte(recolteId, utilisateurId);
+    this.assertRecoltee(recolte);
 
-    await this.findOne(recolteId, id, utilisateurId);
+    const photo = await this.findOne(recolteId, id, utilisateurId);
 
-    return this.prisma.photoRecolte.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(dto.url !== undefined && {
-          url: dto.url,
-        }),
-      },
-    });
+    if (dto.url !== undefined) {
+      photo.url = normalizeUploadUrl(dto.url, 'recoltes');
+    }
+
+    return this.photos.save(photo);
   }
 
-  // =========================
-  // SUPPRIMER UNE PHOTO
-  // =========================
   async remove(recolteId: string, id: string, utilisateurId: string) {
-    await this.verifierRecolte(recolteId, utilisateurId);
+    const recolte = await this.requireRecolte(recolteId, utilisateurId);
+    this.assertRecoltee(recolte);
 
-    await this.findOne(recolteId, id, utilisateurId);
+    const photo = await this.findOne(recolteId, id, utilisateurId);
+    await this.photos.remove(photo);
 
-    return this.prisma.photoRecolte.delete({
-      where: {
-        id,
-      },
-    });
+    return { id, deleted: true };
   }
 }

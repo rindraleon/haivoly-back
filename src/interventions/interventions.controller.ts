@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import {
   Body,
   Controller,
@@ -7,76 +6,162 @@ import {
   Param,
   Patch,
   Post,
-  Request,
   UseGuards,
 } from '@nestjs/common';
 
 import { InterventionsService } from './interventions.service';
-
-import { CreateInterventionDto } from './dto/creation-intervention.dto';
-import { UpdateInterventionDto } from './dto/modification-intervention.dto';
-
+import {
+  CreateInterventionDto,
+  UpdateInterventionDto,
+} from './dto/intervention.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
 
-@Controller('parcelles/:parcelleId/cultures/:cultureId/interventions')
+/**
+ * Les interventions sont rattachées à une culture, elle-même rattachée à une
+ * parcelle. Les routes imbriquées historiques sont conservées ; les routes
+ * courtes `/cultures/:cultureId/interventions` sont ajoutées pour le mobile
+ * (elles vérifient l'ownership de la même manière).
+ */
+@Controller()
 @UseGuards(JwtAuthGuard)
 export class InterventionsController {
   constructor(private readonly interventionsService: InterventionsService) {}
 
-  // =========================
-  // CRÉER
-  // =========================
-  @Post()
+  @Post('parcelles/:parcelleId/cultures/:cultureId/interventions')
+  createNested(
+    @Param('parcelleId') parcelleId: string,
+    @Param('cultureId') cultureId: string,
+    @Body() dto: CreateInterventionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.create(
+      cultureId,
+      dto,
+      user.id,
+      parcelleId,
+    );
+  }
+
+  @Get('parcelles/:parcelleId/cultures/:cultureId/interventions')
+  findAllNested(
+    @Param('parcelleId') parcelleId: string,
+    @Param('cultureId') cultureId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.findAll(cultureId, user.id, parcelleId);
+  }
+
+  @Get('parcelles/:parcelleId/cultures/:cultureId/interventions/:id')
+  findOneNested(
+    @Param('parcelleId') parcelleId: string,
+    @Param('cultureId') cultureId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.findOne(
+      cultureId,
+      id,
+      user.id,
+      parcelleId,
+    );
+  }
+
+  @Patch('parcelles/:parcelleId/cultures/:cultureId/interventions/:id')
+  updateNested(
+    @Param('parcelleId') parcelleId: string,
+    @Param('cultureId') cultureId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateInterventionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.update(
+      cultureId,
+      id,
+      dto,
+      user.id,
+      parcelleId,
+    );
+  }
+
+  @Delete('parcelles/:parcelleId/cultures/:cultureId/interventions/:id')
+  removeNested(
+    @Param('parcelleId') parcelleId: string,
+    @Param('cultureId') cultureId: string,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.remove(cultureId, id, user.id, parcelleId);
+  }
+
+  // ── Routes courtes (mobile) ────────────────────────────────
+
+  @Post('cultures/:cultureId/interventions')
   create(
     @Param('cultureId') cultureId: string,
     @Body() dto: CreateInterventionDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.interventionsService.create(cultureId, dto, req.user.id);
+    return this.interventionsService.create(cultureId, dto, user.id);
   }
 
-  // =========================
-  // LISTE
-  // =========================
-  @Get()
-  findAll(@Param('cultureId') cultureId: string, @Request() req: any) {
-    return this.interventionsService.findAll(cultureId, req.user.id);
+  @Get('cultures/:cultureId/interventions')
+  findAll(
+    @Param('cultureId') cultureId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.findAll(cultureId, user.id);
   }
 
-  // =========================
-  // UNE INTERVENTION
-  // =========================
-  @Get(':id')
+  @Get('cultures/:cultureId/interventions/:id')
   findOne(
     @Param('cultureId') cultureId: string,
     @Param('id') id: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.interventionsService.findOne(cultureId, id, req.user.id);
+    return this.interventionsService.findOne(cultureId, id, user.id);
   }
 
-  // =========================
-  // MODIFIER
-  // =========================
-  @Patch(':id')
+  @Patch('cultures/:cultureId/interventions/:id')
   update(
     @Param('cultureId') cultureId: string,
     @Param('id') id: string,
     @Body() dto: UpdateInterventionDto,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.interventionsService.update(cultureId, id, dto, req.user.id);
+    return this.interventionsService.update(cultureId, id, dto, user.id);
   }
 
-  // =========================
-  // SUPPRIMER
-  // =========================
-  @Delete(':id')
+  @Delete('cultures/:cultureId/interventions/:id')
   remove(
     @Param('cultureId') cultureId: string,
     @Param('id') id: string,
-    @Request() req: any,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.interventionsService.remove(cultureId, id, req.user.id);
+    return this.interventionsService.remove(cultureId, id, user.id);
+  }
+
+  // ── Routes plates (mobile : `/interventions/:id`) ──────────
+  // Même contrôle d'ownership : la culture est retrouvée à partir de
+  // l'intervention puis vérifiée comme propriété de l'utilisateur.
+
+  @Get('interventions/:id')
+  findOneFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.interventionsService.findOneById(id, user.id);
+  }
+
+  @Patch('interventions/:id')
+  updateFlat(
+    @Param('id') id: string,
+    @Body() dto: UpdateInterventionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.interventionsService.updateById(id, dto, user.id);
+  }
+
+  @Delete('interventions/:id')
+  removeFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.interventionsService.removeById(id, user.id);
   }
 }

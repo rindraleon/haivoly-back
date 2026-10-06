@@ -1,37 +1,5 @@
-import { IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
 
-import { StatutCulture } from '@prisma/client';
+import { CreateCultureDto } from './creation-culture.dto';
 
-export class UpdateCultureDto {
-  @IsOptional()
-  @IsString()
-  nom?: string;
-
-  @IsOptional()
-  @IsString()
-  type?: string;
-
-  @IsOptional()
-  @IsString()
-  variete?: string;
-
-  @IsOptional()
-  @IsDateString()
-  datePlantation?: string;
-
-  @IsOptional()
-  @IsDateString()
-  datePrevueRecolte?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsString()
-  stade?: string;
-
-  @IsOptional()
-  @IsEnum(StatutCulture)
-  statut?: StatutCulture;
-}
+export class UpdateCultureDto extends PartialType(CreateCultureDto) {}

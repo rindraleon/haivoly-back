@@ -2,29 +2,33 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MailService } from './mail.service';
-import { PrismaModule } from '../prisma/prisma.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { Utilisateur } from '../users/entities/utilisateur.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 
 @Module({
   imports: [
-    PrismaModule,
+    TypeOrmModule.forFeature([Utilisateur, PasswordResetToken]),
     ConfigModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
+      useFactory: (config: ConfigService) => ({
+        secret: config.get<string>('JWT_SECRET') ?? 'change-me',
+        signOptions: {
+          expiresIn: (config.get<string>('JWT_EXPIRES_IN') ?? '7d') as never,
+        },
       }),
     }),
   ],
   controllers: [AuthController],
   providers: [AuthService, MailService, JwtStrategy],
-  exports: [MailService],
+  exports: [AuthService, MailService],
 })
 export class AuthModule {}

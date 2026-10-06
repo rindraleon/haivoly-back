@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { PhotosController } from './photos.controller';
-import { PhotosUploadController } from './photos-upload.controller';
 import { PhotosService } from './photos.service';
-
-import { PrismaModule } from '../prisma/prisma.module';
+import { Photo } from './entities/photo.entity';
+import { Observation } from '../observations/entities/observation.entity';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [PhotosController, PhotosUploadController],
+  imports: [TypeOrmModule.forFeature([Photo, Observation])],
+  controllers: [PhotosController],
   providers: [PhotosService],
+  exports: [PhotosService],
 })
 export class PhotosModule {}

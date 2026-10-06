@@ -1,19 +1,15 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { PhotosInterventionsController } from './photos-interventions.controller';
-import { PhotosInterventionsUploadController } from './photos-interventions-upload.controller';
 import { PhotosInterventionsService } from './photos-interventions.service';
-
-import { PrismaService } from '../prisma/prisma.service';
+import { PhotoIntervention } from './entities/photo-intervention.entity';
+import { Intervention } from '../interventions/entities/intervention.entity';
 
 @Module({
-  controllers: [
-    PhotosInterventionsController,
-    PhotosInterventionsUploadController,
-  ],
-
-  providers: [PhotosInterventionsService, PrismaService],
-
+  imports: [TypeOrmModule.forFeature([PhotoIntervention, Intervention])],
+  controllers: [PhotosInterventionsController],
+  providers: [PhotosInterventionsService],
   exports: [PhotosInterventionsService],
 })
 export class PhotosInterventionsModule {}

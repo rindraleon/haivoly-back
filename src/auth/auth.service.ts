@@ -6,161 +6,188 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
+import { Repository } from 'typeorm';
 
-import { PrismaService } from '../prisma/prisma.service';
+import { Utilisateur } from '../users/entities/utilisateur.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailService } from './mail.service';
+import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
+
+export interface PublicUtilisateur {
+  id: string;
+  nom: string;
+  prenom: string | null;
+  email: string;
+  telephone: string | null;
+  role: string;
+  creeA: Date;
+}
+
+const BCRYPT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 heure
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @InjectRepository(Utilisateur)
+    private readonly utilisateurs: Repository<Utilisateur>,
+    @InjectRepository(PasswordResetToken)
+    private readonly resetTokens: Repository<PasswordResetToken>,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
   ) {}
 
+  /** Ne jamais renvoyer le hash du mot de passe. */
+  private toPublic(user: Utilisateur): PublicUtilisateur {
+    return {
+      id: user.id,
+      nom: user.nom,
+      prenom: user.prenom,
+      email: user.email,
+      telephone: user.telephone,
+      role: user.role,
+      creeA: user.creeA,
+    };
+  }
+
   // =========================
   // REGISTER
   // =========================
-  async register(registerDto: RegisterDto) {
-    const existingUser = await this.prisma.utilisateur.findUnique({
-      where: { email: registerDto.email },
-    });
+  async register(dto: RegisterDto): Promise<PublicUtilisateur> {
+    const email = dto.email.toLowerCase().trim();
 
-    if (existingUser) {
+    const existing = await this.utilisateurs.findOne({ where: { email } });
+    if (existing) {
       throw new ConflictException('Cet email est déjà utilisé');
     }
 
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-
-    const utilisateur = await this.prisma.utilisateur.create({
-      data: {
-        nom: registerDto.nom,
-        prenom: registerDto.prenom,
-        email: registerDto.email,
-        telephone: registerDto.telephone,
-        password: hashedPassword,
-      },
+    const utilisateur = this.utilisateurs.create({
+      nom: dto.nom.trim(),
+      prenom: dto.prenom?.trim() ?? null,
+      email,
+      telephone: dto.telephone?.trim() ?? null,
+      password: await bcrypt.hash(dto.password, BCRYPT_ROUNDS),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _, ...result } = utilisateur;
-    return result;
+    const saved = await this.utilisateurs.save(utilisateur);
+    this.logger.log(`[register] Nouvel utilisateur ${saved.id}`);
+
+    return this.toPublic(saved);
   }
 
   // =========================
   // LOGIN
   // =========================
-  async login(loginDto: LoginDto) {
-    const utilisateur = await this.prisma.utilisateur.findUnique({
-      where: { email: loginDto.email },
-    });
+  async login(dto: LoginDto): Promise<{
+    access_token: string;
+    utilisateur: PublicUtilisateur;
+  }> {
+    const email = dto.email.toLowerCase().trim();
 
+    const utilisateur = await this.utilisateurs.findOne({ where: { email } });
     if (!utilisateur) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
     const passwordValid = await bcrypt.compare(
-      loginDto.password,
+      dto.password,
       utilisateur.password,
     );
-
     if (!passwordValid) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
-    const payload = {
+    const access_token = await this.jwtService.signAsync({
       sub: utilisateur.id,
       email: utilisateur.email,
       role: utilisateur.role,
-    };
+    });
 
-    const access_token = await this.jwtService.signAsync(payload);
+    this.logger.log(`[login] ${utilisateur.id}`);
 
-    return {
-      access_token,
-      utilisateur: {
-        id: utilisateur.id,
-        nom: utilisateur.nom,
-        prenom: utilisateur.prenom,
-        email: utilisateur.email,
-        telephone: utilisateur.telephone,
-        role: utilisateur.role,
-      },
-    };
+    return { access_token, utilisateur: this.toPublic(utilisateur) };
+  }
+
+  // =========================
+  // LOGOUT
+  // =========================
+  /**
+   * Les JWT sont stateless : la révocation est gérée côté client
+   * (suppression du token du SecureStore). Cet endpoint existe pour que le
+   * mobile dispose d'un point d'appel explicite et journalisé.
+   */
+  logout(user: AuthenticatedUser): { message: string } {
+    this.logger.log(`[logout] ${user.id}`);
+    return { message: 'Déconnexion réussie' };
+  }
+
+  // =========================
+  // CURRENT USER
+  // =========================
+  async me(user: AuthenticatedUser): Promise<PublicUtilisateur> {
+    const utilisateur = await this.utilisateurs.findOne({
+      where: { id: user.id },
+    });
+
+    if (!utilisateur) {
+      throw new UnauthorizedException('Utilisateur introuvable');
+    }
+
+    return this.toPublic(utilisateur);
   }
 
   // =========================
   // FORGOT PASSWORD
   // =========================
-  async forgotPassword(email: string) {
-    const normalizedEmail = email.toLowerCase().trim();
+  async forgotPassword(rawEmail: string) {
+    const email = rawEmail.toLowerCase().trim();
 
-    // Toujours retourner le même message pour éviter l'énumération
+    // Réponse identique quel que soit le résultat (anti-énumération)
     const genericResponse = {
       message:
         'Si un compte est associé à cette adresse, un email de réinitialisation a été envoyé. Pensez à vérifier vos courriers indésirables.',
     };
 
-    const utilisateur = await this.prisma.utilisateur.findUnique({
-      where: { email: normalizedEmail },
-    });
+    const utilisateur = await this.utilisateurs.findOne({ where: { email } });
 
-    // Ne pas révéler si l'email existe
     if (!utilisateur) {
       this.logger.log(
-        `[forgot-password] Demande pour email inexistant: ${normalizedEmail} (réponse générique)`,
+        `[forgot-password] email inexistant (${email}) → réponse générique`,
       );
-      // Simuler un délai pour éviter le timing attack
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((resolve) => setTimeout(resolve, 400));
       return genericResponse;
     }
 
-    // Invalider les anciens tokens non utilisés de cet email
-    await this.prisma.passwordResetToken.updateMany({
-      where: { email: normalizedEmail, used: false },
-      data: { used: true },
-    });
+    // Invalider les anciens tokens non utilisés
+    await this.resetTokens.update({ email, used: false }, { used: true });
 
-    // Générer un token sécurisé (32 bytes = 64 chars hex)
     const rawToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto
-      .createHash('sha256')
-      .update(rawToken)
-      .digest('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 60 minutes
+    const tokenHash = this.hashToken(rawToken);
 
-    await this.prisma.passwordResetToken.create({
-      data: {
-        email: normalizedEmail,
+    await this.resetTokens.save(
+      this.resetTokens.create({
+        email,
         tokenHash,
-        expiresAt,
+        expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
         utilisateurId: utilisateur.id,
-      },
-    });
+      }),
+    );
 
     const resetUrl = this.mailService.buildResetUrl(rawToken);
 
     try {
-      await this.mailService.sendPasswordResetEmail(normalizedEmail, resetUrl);
+      await this.mailService.sendPasswordResetEmail(email, resetUrl);
     } catch (error) {
-      this.logger.error(
-        `Erreur envoi email reset pour ${normalizedEmail}`,
-        error,
-      );
-      // Ne pas exposer l'erreur à l'utilisateur
+      this.logger.error(`Erreur envoi email reset pour ${email}`, error);
     }
 
-    this.logger.log(
-      `[forgot-password] Token généré pour ${normalizedEmail} - expire à ${expiresAt.toISOString()}`,
-    );
-
-    // En développement, exposer le token pour faciliter les tests (ne pas faire en prod)
     if (process.env.NODE_ENV !== 'production') {
       return {
         ...genericResponse,
@@ -190,13 +217,8 @@ export class AuthService {
       );
     }
 
-    // Vérifier la robustesse minimalement (au moins une majuscule, une minuscule, un chiffre)
-    // Optionnel mais recommandé UX - on laisse le backend permissif, frontend fera le reste
-
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-
-    const stored = await this.prisma.passwordResetToken.findUnique({
-      where: { tokenHash },
+    const stored = await this.resetTokens.findOne({
+      where: { tokenHash: this.hashToken(token) },
     });
 
     if (!stored) {
@@ -207,13 +229,13 @@ export class AuthService {
       throw new BadRequestException('Ce lien a déjà été utilisé');
     }
 
-    if (stored.expiresAt < new Date()) {
+    if (stored.expiresAt.getTime() < Date.now()) {
       throw new BadRequestException(
         'Le lien de réinitialisation a expiré. Veuillez refaire une demande.',
       );
     }
 
-    const utilisateur = await this.prisma.utilisateur.findUnique({
+    const utilisateur = await this.utilisateurs.findOne({
       where: { email: stored.email },
     });
 
@@ -221,34 +243,46 @@ export class AuthService {
       throw new BadRequestException('Utilisateur associé introuvable');
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
-    // Mettre à jour le mot de passe + invalider le token en transaction
-    await this.prisma.$transaction(async (tx) => {
-      await tx.utilisateur.update({
-        where: { id: utilisateur.id },
-        data: { password: hashedPassword },
-      });
+    // Transaction : mot de passe + invalidation de TOUS les tokens
+    await this.resetTokens.manager.transaction(async (manager) => {
+      await manager.update(
+        Utilisateur,
+        { id: utilisateur.id },
+        { password: hashedPassword },
+      );
 
-      await tx.passwordResetToken.update({
-        where: { id: stored.id },
-        data: { used: true },
-      });
-
-      // Invalider tous les autres tokens de cet utilisateur
-      await tx.passwordResetToken.updateMany({
-        where: { email: stored.email, used: false },
-        data: { used: true },
-      });
+      await manager.update(
+        PasswordResetToken,
+        { email: stored.email, used: false },
+        { used: true },
+      );
     });
 
     this.logger.log(
-      `[reset-password] Mot de passe réinitialisé pour ${stored.email}`,
+      `[reset-password] Mot de passe réinitialisé (${stored.email})`,
     );
 
     return {
       message:
         'Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter.',
     };
+  }
+
+  /** Purge des tokens expirés — appelée par la tâche planifiée du module. */
+  async purgeExpiredResetTokens(): Promise<number> {
+    const result = await this.resetTokens
+      .createQueryBuilder()
+      .delete()
+      .where('"expiresAt" < :now', { now: new Date() })
+      .orWhere('"used" = true AND "expiresAt" < :now', { now: new Date() })
+      .execute();
+
+    return result.affected ?? 0;
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 }

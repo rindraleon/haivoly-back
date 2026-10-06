@@ -4,355 +4,186 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import { PrismaService } from '../prisma/prisma.service';
-
-import { CreatePhotoInterventionDto } from './dto/creation-photo-intervention.dto';
-import { UpdatePhotoInterventionDto } from './dto/modification-photo-intervention.dto';
+import { PhotoIntervention } from './entities/photo-intervention.entity';
+import { Intervention } from '../interventions/entities/intervention.entity';
+import { StatutCulture } from '../common/enums/domain.enums';
+import { normalizeUploadUrl } from '../common/utils/upload.util';
 
 @Injectable()
 export class PhotosInterventionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @InjectRepository(PhotoIntervention)
+    private readonly photos: Repository<PhotoIntervention>,
+    @InjectRepository(Intervention)
+    private readonly interventions: Repository<Intervention>,
+  ) {}
 
-  // =========================
-  // NORMALISER L'URL PHOTO
-  // =========================
-  private normaliserUrlPhoto(url: string): string {
-    const value = url?.trim();
-
-    if (!value) {
-      throw new BadRequestException(
-        'L’URL de la photo est obligatoire',
-      );
-    }
-
-    // URL complète
-    if (/^https?:\/\//i.test(value)) {
-      try {
-        const parsed = new URL(value);
-
-        // Toute URL locale de notre API devient un chemin relatif.
-        if (
-          parsed.pathname.startsWith(
-            '/uploads/interventions/',
-          )
-        ) {
-          const filename = parsed.pathname
-            .replace(
-              /^\/uploads\/interventions\//,
-              '',
-            )
-            .trim();
-
-          if (!filename) {
-            throw new BadRequestException(
-              'Le nom du fichier photo est manquant',
-            );
-          }
-
-          return `/uploads/interventions/${filename}`;
-        }
-
-        // URL externe : on la conserve.
-        return value;
-      } catch (error) {
-        if (error instanceof BadRequestException) {
-          throw error;
-        }
-
-        throw new BadRequestException(
-          'URL de photo invalide',
-        );
-      }
-    }
-
-    // Chemin local déjà correct.
-    if (
-      value.startsWith(
-        '/uploads/interventions/',
-      )
-    ) {
-      const filename = value
-        .replace(
-          /^\/uploads\/interventions\//,
-          '',
-        )
-        .trim();
-
-      if (!filename) {
-        throw new BadRequestException(
-          'Le nom du fichier photo est manquant',
-        );
-      }
-
-      return `/uploads/interventions/${filename}`;
-    }
-
-    throw new BadRequestException(
-      'La photo doit utiliser un chemin /uploads/interventions/... ou une URL externe valide',
-    );
-  }
-
-  // =========================
-  // VÉRIFIER L'INTERVENTION
-  // =========================
-  private async verifierIntervention(
+  private async requireIntervention(
     interventionId: string,
-    cultureId: string,
     utilisateurId: string,
-  ) {
-    const intervention =
-      await this.prisma.intervention.findFirst({
-        where: {
-          id: interventionId,
-          cultureId,
-          culture: {
-            parcelle: {
-              utilisateurId,
-            },
-          },
-        },
-        include: {
-          culture: true,
-        },
-      });
-
-    if (!intervention) {
-      throw new NotFoundException(
-        'Intervention introuvable',
-      );
-    }
+    cultureId?: string,
+  ): Promise<Intervention> {
+    const intervention = await this.interventions.findOne({
+      where: {
+        id: interventionId,
+        ...(cultureId ? { cultureId } : {}),
+        culture: { parcelle: { utilisateurId } },
+      },
+      relations: { culture: true },
+    });
 
     if (
-      intervention.culture.statut ===
-      'SUPPRIMEE'
+      !intervention ||
+      intervention.culture?.statut === StatutCulture.SUPPRIMEE
     ) {
-      throw new NotFoundException(
-        'Culture introuvable',
-      );
+      throw new NotFoundException('Intervention introuvable');
     }
 
     return intervention;
   }
 
-  // =========================
-  // AJOUTER UNE PHOTO
-  // =========================
+  private assertModifiable(intervention: Intervention, action: string): void {
+    const statut = intervention.culture?.statut;
+    if (
+      statut === StatutCulture.RECOLTEE ||
+      statut === StatutCulture.ABANDONNEE
+    ) {
+      throw new ForbiddenException(
+        `Impossible de ${action} une photo d’une intervention d’une culture terminée`,
+      );
+    }
+  }
+
   async create(
     interventionId: string,
     cultureId: string,
-    dto: CreatePhotoInterventionDto,
+    dto: { url: string; description?: string },
     utilisateurId: string,
   ) {
-    const intervention =
-      await this.verifierIntervention(
+    const intervention = await this.requireIntervention(
+      interventionId,
+      utilisateurId,
+      cultureId,
+    );
+    this.assertModifiable(intervention, 'ajouter');
+
+    return this.photos.save(
+      this.photos.create({
+        url: normalizeUploadUrl(dto.url, 'interventions'),
+        description: dto.description?.trim() ?? null,
         interventionId,
-        cultureId,
-        utilisateurId,
-      );
-
-    if (
-      intervention.culture.statut === 'RECOLTEE' ||
-      intervention.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible d’ajouter une photo à une intervention d’une culture terminée',
-      );
-    }
-
-    const url = this.normaliserUrlPhoto(dto.url);
-
-    return this.prisma.photoIntervention.create({
-      data: {
-        url,
-        description: dto.description,
-        interventionId,
-      },
-    });
+      }),
+    );
   }
 
-  // =========================
-  // UPLOADER UNE PHOTO
-  // =========================
   async upload(
     interventionId: string,
     cultureId: string,
     utilisateurId: string,
-    url: string,
+    relativeUrl: string,
   ) {
-    const intervention =
-      await this.verifierIntervention(
-        interventionId,
-        cultureId,
-        utilisateurId,
-      );
+    const intervention = await this.requireIntervention(
+      interventionId,
+      utilisateurId,
+      cultureId,
+    );
+    this.assertModifiable(intervention, 'ajouter');
 
-    if (
-      intervention.culture.statut === 'RECOLTEE' ||
-      intervention.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible d’ajouter une photo à une intervention d’une culture terminée',
-      );
-    }
-
-    const normalizedUrl =
-      this.normaliserUrlPhoto(url);
-
-    return this.prisma.photoIntervention.create({
-      data: {
-        url: normalizedUrl,
-        interventionId,
-      },
-    });
+    return this.photos.save(
+      this.photos.create({ url: relativeUrl, interventionId }),
+    );
   }
 
-  // =========================
-  // RÉCUPÉRER LES PHOTOS
-  // =========================
   async findAll(
     interventionId: string,
     cultureId: string,
     utilisateurId: string,
   ) {
-    await this.verifierIntervention(
-      interventionId,
-      cultureId,
-      utilisateurId,
-    );
-
-    return this.prisma.photoIntervention.findMany({
-      where: {
-        interventionId,
-      },
-      orderBy: {
-        dateAjout: 'desc',
-      },
+    await this.requireIntervention(interventionId, utilisateurId, cultureId);
+    return this.photos.find({
+      where: { interventionId },
+      order: { dateAjout: 'DESC' },
     });
   }
 
-  // =========================
-  // RÉCUPÉRER UNE PHOTO
-  // =========================
   async findOne(
     interventionId: string,
     cultureId: string,
     id: string,
     utilisateurId: string,
   ) {
-    await this.verifierIntervention(
-      interventionId,
-      cultureId,
-      utilisateurId,
-    );
+    await this.requireIntervention(interventionId, utilisateurId, cultureId);
 
-    const photo =
-      await this.prisma.photoIntervention.findFirst({
-        where: {
-          id,
-          interventionId,
-        },
-      });
+    const photo = await this.photos.findOne({
+      where: { id, interventionId },
+    });
 
     if (!photo) {
-      throw new NotFoundException(
-        'Photo introuvable',
-      );
+      throw new NotFoundException('Photo introuvable');
     }
 
     return photo;
   }
 
-  // =========================
-  // MODIFIER UNE PHOTO
-  // =========================
   async update(
     interventionId: string,
     cultureId: string,
     id: string,
-    dto: UpdatePhotoInterventionDto,
+    dto: { url?: string; description?: string },
     utilisateurId: string,
   ) {
-    const intervention =
-      await this.verifierIntervention(
-        interventionId,
-        cultureId,
-        utilisateurId,
-      );
+    const intervention = await this.requireIntervention(
+      interventionId,
+      utilisateurId,
+      cultureId,
+    );
+    this.assertModifiable(intervention, 'modifier');
 
-    if (
-      intervention.culture.statut === 'RECOLTEE' ||
-      intervention.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible de modifier une photo d’une intervention d’une culture terminée',
-      );
+    if (dto.url === undefined && dto.description === undefined) {
+      throw new BadRequestException('Aucune modification fournie');
     }
 
-    await this.findOne(
+    const photo = await this.findOne(
       interventionId,
       cultureId,
       id,
       utilisateurId,
     );
 
-    const normalizedUrl =
-      dto.url !== undefined
-        ? this.normaliserUrlPhoto(dto.url)
-        : undefined;
+    if (dto.url !== undefined) {
+      photo.url = normalizeUploadUrl(dto.url, 'interventions');
+    }
+    if (dto.description !== undefined) {
+      photo.description = dto.description.trim();
+    }
 
-    return this.prisma.photoIntervention.update({
-      where: {
-        id,
-      },
-      data: {
-        ...(normalizedUrl !== undefined && {
-          url: normalizedUrl,
-        }),
-
-        ...(dto.description !== undefined && {
-          description: dto.description,
-        }),
-      },
-    });
+    return this.photos.save(photo);
   }
 
-  // =========================
-  // SUPPRIMER UNE PHOTO
-  // =========================
   async remove(
     interventionId: string,
     cultureId: string,
     id: string,
     utilisateurId: string,
   ) {
-    const intervention =
-      await this.verifierIntervention(
-        interventionId,
-        cultureId,
-        utilisateurId,
-      );
+    const intervention = await this.requireIntervention(
+      interventionId,
+      utilisateurId,
+      cultureId,
+    );
+    this.assertModifiable(intervention, 'supprimer');
 
-    if (
-      intervention.culture.statut === 'RECOLTEE' ||
-      intervention.culture.statut === 'ABANDONNEE'
-    ) {
-      throw new ForbiddenException(
-        'Impossible de supprimer une photo d’une intervention d’une culture terminée',
-      );
-    }
-
-    await this.findOne(
+    const photo = await this.findOne(
       interventionId,
       cultureId,
       id,
       utilisateurId,
     );
+    await this.photos.remove(photo);
 
-    return this.prisma.photoIntervention.delete({
-      where: {
-        id,
-      },
-    });
+    return { id, deleted: true };
   }
 }

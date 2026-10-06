@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common';
-import { RecommendationsService } from './recommendations.service';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
 import { RecommendationsController } from './recommendations.controller';
-import { PrismaModule } from '../prisma/prisma.module';
+import { RecommendationsService } from './recommendations.service';
+import { Recommendation } from './entities/recommendation.entity';
+import { Utilisateur } from '../users/entities/utilisateur.entity';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [TypeOrmModule.forFeature([Recommendation, Utilisateur])],
   controllers: [RecommendationsController],
   providers: [RecommendationsService],
   exports: [RecommendationsService],

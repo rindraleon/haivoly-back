@@ -1,4 +1,11 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 
 import { SynchronizationService } from './synchronization.service';
 import { SyncDto, BatchSyncDto } from '../actions/dto/batch-sync.dto';
@@ -17,7 +24,9 @@ export class SynchronizationController {
     private readonly synchronizationService: SynchronizationService,
   ) {}
 
+  /** Traitement d'une file d'actions : 200 (aucune ressource créée). */
   @Post()
+  @HttpCode(HttpStatus.OK)
   synchronize(@Body() dto: SyncDto, @CurrentUser() user: AuthenticatedUser) {
     return this.synchronizationService.synchronize(user.id, dto);
   }
@@ -31,11 +40,13 @@ export class ActionsSyncAliasController {
   ) {}
 
   @Post('sync')
+  @HttpCode(HttpStatus.OK)
   sync(@Body() dto: SyncDto, @CurrentUser() user: AuthenticatedUser) {
     return this.synchronizationService.synchronize(user.id, dto);
   }
 
   @Post('batch-sync')
+  @HttpCode(HttpStatus.OK)
   batchSync(@Body() dto: BatchSyncDto, @CurrentUser() user: AuthenticatedUser) {
     return this.synchronizationService.synchronize(user.id, dto);
   }

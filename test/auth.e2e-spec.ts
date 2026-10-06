@@ -1,19 +1,16 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import type { Server } from 'http';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
-import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
-import { TransformResponseInterceptor } from '../src/common/interceptors/transform-response.interceptor';
+import { configurerApplication } from '../src/app.setup';
 
 /**
  * Tests e2e — nécessitent une base PostgreSQL accessible via DATABASE_URL
  * (voir .env.example → DATABASE_URL_TEST).
  */
 describe('Parcours complet API (e2e)', () => {
-  let app: INestApplication;
+  let app: NestExpressApplication;
   let token: string;
   let parcelleId: string;
   let cultureId: string;
@@ -27,15 +24,9 @@ describe('Parcours complet API (e2e)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-    app.useGlobalFilters(new AllExceptionsFilter());
-    app.useGlobalInterceptors(new TransformResponseInterceptor());
+    // Même configuration que le serveur réel : un test vert décrit bien le
+    // comportement observé par l'utilisateur.
+    configurerApplication(app);
 
     await app.init();
   });
@@ -44,7 +35,7 @@ describe('Parcours complet API (e2e)', () => {
     await app.close();
   });
 
-  const api = () => request(app.getHttpServer() as Server);
+  const api = () => request(app.getHttpServer());
 
   it('POST /auth/register crée un compte sans exposer le mot de passe', async () => {
     const res = await api()
@@ -58,10 +49,11 @@ describe('Parcours complet API (e2e)', () => {
   });
 
   it('POST /auth/login délivre un JWT', async () => {
+    // Une connexion n'est pas une création de ressource : 200 et non 201.
     const res = await api()
       .post('/auth/login')
       .send({ email, password })
-      .expect(201);
+      .expect(200);
 
     token = res.body.data.access_token;
     expect(typeof token).toBe('string');
@@ -210,7 +202,7 @@ describe('Parcours complet API (e2e)', () => {
       .post('/sync')
       .set('Authorization', `Bearer ${token}`)
       .send(body)
-      .expect(201);
+      .expect(200);
 
     expect(first.body.data.results[0].status).toBe('SYNCED');
 
@@ -218,7 +210,7 @@ describe('Parcours complet API (e2e)', () => {
       .post('/sync')
       .set('Authorization', `Bearer ${token}`)
       .send(body)
-      .expect(201);
+      .expect(200);
 
     expect(second.body.data.results[0].status).toBe('DUPLICATE');
 
@@ -234,6 +226,78 @@ describe('Parcours complet API (e2e)', () => {
     expect(created).toHaveLength(1);
   });
 
+  it('renvoie un contrat d’erreur normalisé et indexé', async () => {
+    // Champ indexé au cœur d'un tableau : le mobile doit pouvoir rattacher
+    // l'erreur au BON élément du formulaire.
+    const invalide = await api()
+      .post('/parcelles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nom: 'Parcelle invalide e2e',
+        pointsGPS: [
+          { latitude: 'nord', longitude: 47.5 },
+          { latitude: -18.9, longitude: 47.5 },
+        ],
+      })
+      .expect(400);
+
+    expect(invalide.body.success).toBe(false);
+    expect(invalide.body.code).toBe('VALIDATION_ERROR');
+    expect(invalide.body.errorCode).toBe('VALIDATION_ERROR');
+    expect(invalide.body.path).toBe('/parcelles');
+
+    const champ = invalide.body.fields[0] as {
+      field: string;
+      path: (string | number)[];
+      code: string;
+      message: string;
+    };
+
+    expect(champ.field).toBe('pointsGPS.0.latitude');
+    expect(champ.path).toEqual(['pointsGPS', 0, 'latitude']);
+    expect(champ.code).toBe('VALIDATION_INVALID_FORMAT');
+    // Message français destiné à l'utilisateur, jamais le défaut anglais.
+    expect(champ.message).toMatch(/Latitude invalide/);
+    expect(champ.message).not.toMatch(/must be|should be/);
+
+    // Champ inconnu : code dédié, refusé par la liste blanche.
+    const inconnu = await api()
+      .post('/parcelles')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nom: 'Parcelle e2e', champInconnu: 1 })
+      .expect(400);
+
+    expect(
+      (inconnu.body.fields as { field: string; code: string }[]).some(
+        (f) =>
+          f.field === 'champInconnu' && f.code === 'VALIDATION_UNKNOWN_FIELD',
+      ),
+    ).toBe(true);
+  });
+
+  it('distingue « non authentifié » de « identifiants invalides »', async () => {
+    const sansJeton = await api().get('/parcelles').expect(401);
+    expect(sansJeton.body.code).toBe('AUTH_UNAUTHORIZED');
+    expect(sansJeton.body.message).toMatch(/connecté/i);
+
+    const mauvaisMotDePasse = await api()
+      .post('/auth/login')
+      .send({ email, password: 'mauvais-mot-de-passe' })
+      .expect(401);
+    expect(mauvaisMotDePasse.body.code).toBe('AUTH_INVALID_CREDENTIALS');
+    expect(mauvaisMotDePasse.body.message).not.toMatch(/Internal|stack/i);
+  });
+
+  it('renvoie 404 — et non 403 — pour la ressource d’un autre utilisateur', async () => {
+    const res = await api()
+      .get(`/parcelles/${parcelleId}`)
+      .set('Authorization', 'Bearer jeton.totalement.invalide')
+      .expect(401);
+
+    expect(res.body.code).toBe('AUTH_UNAUTHORIZED');
+    expect(res.body.message).not.toMatch(/JsonWebToken|jwt/i);
+  });
+
   it('un utilisateur ne peut pas lire les données d’un autre (ownership)', async () => {
     const otherEmail = `e2e-other-${Date.now()}@haivoly.mg`;
 
@@ -245,7 +309,7 @@ describe('Parcours complet API (e2e)', () => {
     const login = await api()
       .post('/auth/login')
       .send({ email: otherEmail, password })
-      .expect(201);
+      .expect(200);
 
     await api()
       .get(`/parcelles/${parcelleId}`)

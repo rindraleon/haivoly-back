@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,85 @@ export class PhotosInterventionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   // =========================
+  // NORMALISER L'URL PHOTO
+  // =========================
+  private normaliserUrlPhoto(url: string): string {
+    const value = url?.trim();
+
+    if (!value) {
+      throw new BadRequestException(
+        'L’URL de la photo est obligatoire',
+      );
+    }
+
+    // URL complète
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const parsed = new URL(value);
+
+        // Toute URL locale de notre API devient un chemin relatif.
+        if (
+          parsed.pathname.startsWith(
+            '/uploads/interventions/',
+          )
+        ) {
+          const filename = parsed.pathname
+            .replace(
+              /^\/uploads\/interventions\//,
+              '',
+            )
+            .trim();
+
+          if (!filename) {
+            throw new BadRequestException(
+              'Le nom du fichier photo est manquant',
+            );
+          }
+
+          return `/uploads/interventions/${filename}`;
+        }
+
+        // URL externe : on la conserve.
+        return value;
+      } catch (error) {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
+
+        throw new BadRequestException(
+          'URL de photo invalide',
+        );
+      }
+    }
+
+    // Chemin local déjà correct.
+    if (
+      value.startsWith(
+        '/uploads/interventions/',
+      )
+    ) {
+      const filename = value
+        .replace(
+          /^\/uploads\/interventions\//,
+          '',
+        )
+        .trim();
+
+      if (!filename) {
+        throw new BadRequestException(
+          'Le nom du fichier photo est manquant',
+        );
+      }
+
+      return `/uploads/interventions/${filename}`;
+    }
+
+    throw new BadRequestException(
+      'La photo doit utiliser un chemin /uploads/interventions/... ou une URL externe valide',
+    );
+  }
+
+  // =========================
   // VÉRIFIER L'INTERVENTION
   // =========================
   private async verifierIntervention(
@@ -21,27 +101,35 @@ export class PhotosInterventionsService {
     cultureId: string,
     utilisateurId: string,
   ) {
-    const intervention = await this.prisma.intervention.findFirst({
-      where: {
-        id: interventionId,
-        cultureId,
-        culture: {
-          parcelle: {
-            utilisateurId,
+    const intervention =
+      await this.prisma.intervention.findFirst({
+        where: {
+          id: interventionId,
+          cultureId,
+          culture: {
+            parcelle: {
+              utilisateurId,
+            },
           },
         },
-      },
-      include: {
-        culture: true,
-      },
-    });
+        include: {
+          culture: true,
+        },
+      });
 
     if (!intervention) {
-      throw new NotFoundException('Intervention introuvable');
+      throw new NotFoundException(
+        'Intervention introuvable',
+      );
     }
 
-    if (intervention.culture.statut === 'SUPPRIMEE') {
-      throw new NotFoundException('Culture introuvable');
+    if (
+      intervention.culture.statut ===
+      'SUPPRIMEE'
+    ) {
+      throw new NotFoundException(
+        'Culture introuvable',
+      );
     }
 
     return intervention;
@@ -56,14 +144,13 @@ export class PhotosInterventionsService {
     dto: CreatePhotoInterventionDto,
     utilisateurId: string,
   ) {
-    const intervention = await this.verifierIntervention(
-      interventionId,
-      cultureId,
-      utilisateurId,
-    );
+    const intervention =
+      await this.verifierIntervention(
+        interventionId,
+        cultureId,
+        utilisateurId,
+      );
 
-    // RECOLTEE et ABANDONNEE :
-    // consultation uniquement
     if (
       intervention.culture.statut === 'RECOLTEE' ||
       intervention.culture.statut === 'ABANDONNEE'
@@ -73,9 +160,11 @@ export class PhotosInterventionsService {
       );
     }
 
+    const url = this.normaliserUrlPhoto(dto.url);
+
     return this.prisma.photoIntervention.create({
       data: {
-        url: dto.url,
+        url,
         description: dto.description,
         interventionId,
       },
@@ -91,14 +180,13 @@ export class PhotosInterventionsService {
     utilisateurId: string,
     url: string,
   ) {
-    const intervention = await this.verifierIntervention(
-      interventionId,
-      cultureId,
-      utilisateurId,
-    );
+    const intervention =
+      await this.verifierIntervention(
+        interventionId,
+        cultureId,
+        utilisateurId,
+      );
 
-    // RECOLTEE et ABANDONNEE :
-    // consultation uniquement
     if (
       intervention.culture.statut === 'RECOLTEE' ||
       intervention.culture.statut === 'ABANDONNEE'
@@ -108,9 +196,12 @@ export class PhotosInterventionsService {
       );
     }
 
+    const normalizedUrl =
+      this.normaliserUrlPhoto(url);
+
     return this.prisma.photoIntervention.create({
       data: {
-        url,
+        url: normalizedUrl,
         interventionId,
       },
     });
@@ -124,7 +215,11 @@ export class PhotosInterventionsService {
     cultureId: string,
     utilisateurId: string,
   ) {
-    await this.verifierIntervention(interventionId, cultureId, utilisateurId);
+    await this.verifierIntervention(
+      interventionId,
+      cultureId,
+      utilisateurId,
+    );
 
     return this.prisma.photoIntervention.findMany({
       where: {
@@ -145,17 +240,24 @@ export class PhotosInterventionsService {
     id: string,
     utilisateurId: string,
   ) {
-    await this.verifierIntervention(interventionId, cultureId, utilisateurId);
+    await this.verifierIntervention(
+      interventionId,
+      cultureId,
+      utilisateurId,
+    );
 
-    const photo = await this.prisma.photoIntervention.findFirst({
-      where: {
-        id,
-        interventionId,
-      },
-    });
+    const photo =
+      await this.prisma.photoIntervention.findFirst({
+        where: {
+          id,
+          interventionId,
+        },
+      });
 
     if (!photo) {
-      throw new NotFoundException('Photo introuvable');
+      throw new NotFoundException(
+        'Photo introuvable',
+      );
     }
 
     return photo;
@@ -171,11 +273,12 @@ export class PhotosInterventionsService {
     dto: UpdatePhotoInterventionDto,
     utilisateurId: string,
   ) {
-    const intervention = await this.verifierIntervention(
-      interventionId,
-      cultureId,
-      utilisateurId,
-    );
+    const intervention =
+      await this.verifierIntervention(
+        interventionId,
+        cultureId,
+        utilisateurId,
+      );
 
     if (
       intervention.culture.statut === 'RECOLTEE' ||
@@ -186,15 +289,25 @@ export class PhotosInterventionsService {
       );
     }
 
-    await this.findOne(interventionId, cultureId, id, utilisateurId);
+    await this.findOne(
+      interventionId,
+      cultureId,
+      id,
+      utilisateurId,
+    );
+
+    const normalizedUrl =
+      dto.url !== undefined
+        ? this.normaliserUrlPhoto(dto.url)
+        : undefined;
 
     return this.prisma.photoIntervention.update({
       where: {
         id,
       },
       data: {
-        ...(dto.url !== undefined && {
-          url: dto.url,
+        ...(normalizedUrl !== undefined && {
+          url: normalizedUrl,
         }),
 
         ...(dto.description !== undefined && {
@@ -213,11 +326,12 @@ export class PhotosInterventionsService {
     id: string,
     utilisateurId: string,
   ) {
-    const intervention = await this.verifierIntervention(
-      interventionId,
-      cultureId,
-      utilisateurId,
-    );
+    const intervention =
+      await this.verifierIntervention(
+        interventionId,
+        cultureId,
+        utilisateurId,
+      );
 
     if (
       intervention.culture.statut === 'RECOLTEE' ||
@@ -228,7 +342,12 @@ export class PhotosInterventionsService {
       );
     }
 
-    await this.findOne(interventionId, cultureId, id, utilisateurId);
+    await this.findOne(
+      interventionId,
+      cultureId,
+      id,
+      utilisateurId,
+    );
 
     return this.prisma.photoIntervention.delete({
       where: {

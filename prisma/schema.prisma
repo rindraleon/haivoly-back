@@ -9,7 +9,7 @@ datasource db {
 model Utilisateur {
   id        String     @id @default(uuid())
   nom       String
-  prenom    String
+  prenom    String?
   email     String     @unique
   telephone String?
   password  String

@@ -1,188 +1,98 @@
-# Haivoly Backend — API NestJS
+<p align="center">
+  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
+</p>
 
-API REST pour la gestion agricole intelligente (parcelles, cultures, observations, interventions, récoltes). Stack moderne, sécurisée et prête pour la production.
+[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
+[circleci-url]: https://circleci.com/gh/nestjs/nest
 
-## Stack
+  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
+    <p align="center">
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
+<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
+<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
+<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
+<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
+<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
+  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
+    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
+  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
+</p>
+  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
+  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-- **Framework :** NestJS 11 + TypeScript 5.7
-- **ORM :** Prisma 7.9 (PostgreSQL + `@prisma/adapter-pg`)
-- **Auth :** Passport + JWT (`@nestjs/jwt` 11, `passport-jwt` 4) + `bcrypt` 6
-- **Validation :** `class-validator` + `class-transformer`
-- **Tests :** Jest 30 + Supertest + ts-jest
-- **Qualité :** ESLint 9 + Prettier 3 + `typescript-eslint`
+## Description
 
-## Prérequis
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
-- Node.js 20+ (recommandé 20.20 LTS) + npm 10+
-- PostgreSQL 14+ (local ou distant)
-- (Optionnel) `psql` pour vérifier la connexion
-
-Vérifier :
-```bash
-node -v   # v20.20.x
-npm -v    # 10.8.x
-psql --version
-```
-
-## Installation
-
-```bash
-cd backend
-npm install
-```
-
-## Configuration — `.env`
-
-Créer `backend/.env` à partir de l'exemple :
-
-```env
-# Base PostgreSQL
-DATABASE_URL="postgresql://postgres:PgAdmin@localhost:5432/HaiVoly?schema=public"
-
-# JWT
-JWT_SECRET="haivoly_jwt_secret_2025_change_me_strong_32chars_min"
-JWT_EXPIRES_IN="7d"
-
-# Serveur
-PORT=3000
-NODE_ENV=development
-
-# Mail (optionnel, dev = log console si absent)
-# MAIL_HOST=smtp.example.com
-# MAIL_PORT=587
-# MAIL_USER=
-# MAIL_PASS=
-```
-
-> `DATABASE_URL` doit pointer vers une base existante `HaiVoly`. Créer la base si besoin :
-> ```bash
-> psql -U postgres -c "CREATE DATABASE \"HaiVoly\";"
-> ```
-
-## Base de données — Prisma
+## Project setup
 
 ```bash
-# Générer le client Prisma (après npm install ou modif de schema.prisma)
-npx prisma generate
-
-# Appliquer les migrations existantes (prod/dev)
-npx prisma migrate deploy
-
-# En dev : créer une migration après modif de schema.prisma
-npx prisma migrate dev --name init
-
-# Ouvrir le studio Prisma (GUI)
-npx prisma studio
-
-# Réinitialiser la base (dev uniquement, destructive)
-npx prisma migrate reset
+$ npm install
 ```
 
-**Schéma :** 12 modèles (`Utilisateur`, `PasswordResetToken`, `Parcelle`, `Culture`, `PointGPS`, `PointGPSCulture`, `Intervention`, `PhotoIntervention`, `Observation`, `Photo`, `Recolte`, `PhotoRecolte`, `Action`, `Recommendation`) + 3 enums (`Role`, `StatutParcelle`, `StatutCulture`).
-
-## Développement
+## Compile and run the project
 
 ```bash
-# Lancer en watch (reload auto)
-npm run start:dev
+# development
+$ npm run start
 
-# Lancer normal
-npm run start
+# watch mode
+$ npm run start:dev
 
-# Lancer en debug (Node --inspect + watch)
-npm run start:debug
-
-# Build (compile TypeScript → dist/)
-npm run build
-
-# Lancer la version buildée (prod)
-npm run start:prod
+# production mode
+$ npm run start:prod
 ```
 
-Serveur par défaut : `http://localhost:3000`
-
-**Vérifier** :
-```bash
-curl http://localhost:3000
-# → Hello World!
-```
-
-## Qualité
+## Run tests
 
 ```bash
-# Formater (Prettier)
-npm run format
+# unit tests
+$ npm run test
 
-# Linter (ESLint + fix)
-npm run lint
+# e2e tests
+$ npm run test:e2e
 
-# Vérification TypeScript (sans émettre)
-npx tsc --noEmit
+# test coverage
+$ npm run test:cov
 ```
 
-> Lint actuel : 505 erreurs `no-unsafe-*` en mode strict — non bloquant, à corriger progressivement (typage Prisma).
+## Deployment
 
-## Tests
+When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+
+If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
 
 ```bash
-# Tests unitaires (Jest)
-npm test
-
-# Watch
-npm run test:watch
-
-# Coverage
-npm run test:cov
-
-# E2E (nécessite config test/jest-e2e.json)
-npm run test:e2e
-
-# Debug
-npm run test:debug
+$ npm install -g @nestjs/mau
+$ mau deploy
 ```
 
-> Après `npm install`, exécuter `npx prisma generate` sinon `Cannot find module '.prisma/client/default'`.
+With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
 
-## API — Endpoints principaux
+## Resources
 
-| Méthode | Route | Auth | Description |
-|---------|-------|------|-------------|
-| `POST` | `/auth/register` | non | Créer un compte (nom, prenom, email, password) |
-| `POST` | `/auth/login` | non | Connexion (email, password) → JWT |
-| `GET` | `/auth/profile` | JWT | Profil utilisateur |
-| `POST` | `/auth/forgot-password` | non | Demander un lien de réinitialisation |
-| `POST` | `/auth/reset-password` | non | Réinitialiser le mot de passe (token) |
-| `GET` | `/dashboard` | JWT | Stats agrégées |
-| `GET/POST` | `/parcelles` | JWT | Lister / créer une parcelle |
-| `GET/PATCH/DELETE` | `/parcelles/:id` | JWT | Détail / modifier / supprimer |
-| `GET/POST` | `/parcelles/:parcelleId/cultures` | JWT | Lister / créer une culture |
-| `GET/DELETE` | `/parcelles/:parcelleId/cultures/:id` | JWT | Détail / supprimer culture (+ points-gps) |
-| `GET/POST` | `/parcelles/:parcelleId/cultures/:cultureId/interventions` | JWT | Interventions |
-| `GET/POST` | `/parcelles/.../observations` | JWT | Observations |
-| `GET/POST` | `/recoltes` | JWT | Récoltes |
-| `POST` | `/actions` , `/actions/batch-sync` | JWT | Sync offline (Action) |
-| `GET` | `/recommendations` | JWT | Recommandations |
+Check out a few resources that may come in handy when working with NestJS:
 
-Tous les DTOs sont validés par `class-validator`.
+- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
+- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
+- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
+- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
+- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
+- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
+- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
+- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
 
-## Déploiement
+## Support
 
-```bash
-npm run build
-# Puis avec PM2, Docker ou Nest Mau :
-npm install -g @nestjs/mau
-mau deploy
-```
+Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
 
-Voir [Nest deployment docs](https://docs.nestjs.com/deployment).
+## Stay in touch
 
-## Dépannage
+- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
+- Website - [https://nestjs.com](https://nestjs.com/)
+- Twitter - [@nestframework](https://twitter.com/nestframework)
 
-- **Prisma : `Can't reach database`** → vérifier `DATABASE_URL` et que PostgreSQL tourne (`pg_isready`)
-- **`JWT_SECRET` manquant** → définir dans `.env` (32+ caractères)
-- **`EADDRINUSE 3000`** → `PORT=3001` ou `lsof -i :3000 && kill -9 <pid>`
-- **Tests échouent `Cannot find module '.prisma/client'`** → `npx prisma generate`
+## License
 
-## Licence
-
-MIT — NestJS
+Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

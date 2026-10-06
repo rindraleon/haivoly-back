@@ -421,7 +421,7 @@ export class CulturesService {
         },
       },
     });
-
+    // eslint-disable-next-line no-console
     console.log('CULTURES ACTIVES:', culturesActives);
 
     // Vérifie si un point est à l'intérieur d'un polygone

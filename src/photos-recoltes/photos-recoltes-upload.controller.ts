@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
 import {
   BadRequestException,
   Controller,
@@ -85,10 +85,7 @@ export class PhotosRecoltesUploadController {
       throw new BadRequestException('Aucune image n’a été envoyée');
     }
 
-    const url =
-      `http://192.168.0.106:3000/uploads/recoltes/` +
-      //`http://192.168.1.43:3000/uploads/recoltes/` +
-      file.filename;
+const url = `/uploads/recoltes/${file.filename}`;
 
     const photo = await this.photosRecoltesService.upload(
       recolteId,

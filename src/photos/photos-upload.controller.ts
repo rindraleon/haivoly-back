@@ -1,7 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-expressions, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unused-expressions, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any */
+
 import {
   BadRequestException,
   Controller,
+  Delete,
   Param,
   Post,
   Request,
@@ -24,6 +26,9 @@ import { PhotosService } from './photos.service';
 export class PhotosUploadController {
   constructor(private readonly photosService: PhotosService) {}
 
+  // ==============================
+  // UPLOAD PHOTO
+  // ==============================
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -36,7 +41,10 @@ export class PhotosUploadController {
 
           const extension = extname(file.originalname).toLowerCase();
 
-          callback(null, `observation-${uniqueSuffix}${extension}`);
+          callback(
+            null,
+            `observation-${uniqueSuffix}${extension}`,
+          );
         },
       }),
 
@@ -45,9 +53,15 @@ export class PhotosUploadController {
       },
 
       fileFilter: (_req, file, callback) => {
-        const extension = extname(file.originalname).toLowerCase();
+        const extension =
+          extname(file.originalname).toLowerCase();
 
-        const extensionsAutorisees = ['.jpg', '.jpeg', '.png', '.webp'];
+        const extensionsAutorisees = [
+          '.jpg',
+          '.jpeg',
+          '.png',
+          '.webp',
+        ];
 
         if (!extensionsAutorisees.includes(extension)) {
           return callback(
@@ -75,12 +89,14 @@ export class PhotosUploadController {
     @Request() req: any,
   ) {
     if (!file) {
-      throw new BadRequestException('Aucune image n’a été envoyée');
+      throw new BadRequestException(
+        'Aucune image n’a été envoyée',
+      );
     }
 
-    const url = `http://192.168.0.106:3000/uploads/observations/`;
-    //`http://192.168.1.43:3000/uploads/observations/` +
-    file.filename;
+    const url =
+  `/uploads/observations/` +
+  file.filename;
 
     const photo = await this.photosService.upload(
       observationId,

@@ -26,7 +26,7 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
 
   await app.listen(3000, '0.0.0.0');
-
+  // eslint-disable-next-line no-console
   console.log(`Haivoly backend running on http://0.0.0.0:3000`);
 }
 bootstrap();

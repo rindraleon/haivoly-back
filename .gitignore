@@ -55,4 +55,7 @@ pids
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
-/generated/prisma
+
+# Contenu téléversé par les utilisateurs (photos) : servi depuis le disque,
+# jamais versionné. Le dossier est recréé au démarrage (`app.setup.ts`).
+uploads/

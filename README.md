@@ -55,6 +55,7 @@ curl http://localhost:3000/health
 | `npm run migration:show`   | Liste les migrations appliquées / en attente     |
 | `npm run migration:revert` | Annule la dernière migration                     |
 | `npm run migration:generate -- src/database/migrations/Nom` | Génère une migration |
+| `bash scripts/qa-contrat-erreurs.sh` | 22 vérifications du contrat d'erreurs et des uploads |
 
 ---
 
@@ -99,7 +100,10 @@ src/
 ├── dashboard/       # indicateurs agrégés
 ├── health/          # /health (état de la base)
 ├── common/          # filtres, intercepteurs, guards, DTO, utilitaires
+│   ├── errors/      # catalogue de codes + ApiException
+│   └── validation/  # indexation des champs fautifs + messages français
 ├── config/          # configuration applicative
+├── app.setup.ts     # configuration unique de l'application (voir §7.1)
 └── database/        # data-source, parsers de types, migrations
 ```
 
@@ -170,7 +174,8 @@ client.
 {
   "success": false,
   "message": "Cette culture possède déjà une récolte",
-  "errorCode": "CONFLICT",
+  "code": "RESOURCE_CONFLICT",          // code stable : c'est LUI que le client interprète
+  "errorCode": "RESOURCE_CONFLICT",     // alias conservé pour les clients déjà déployés
   "path": "/cultures/…/recolte",
   "statusCode": 409,
   "timestamp": "2026-05-18T10:00:00.000Z",
@@ -178,10 +183,74 @@ client.
 }
 ```
 
-Codes de base de données traduits : `23505` → 409 `DUPLICATE_ENTRY`,
-`23503` → 400 `FOREIGN_KEY_VIOLATION`, `23502` → 400 `NOT_NULL_VIOLATION`,
-`23514` → 400 `CHECK_VIOLATION`, `22P02` → 400 `INVALID_INPUT`.
-Aucune stack trace ni requête SQL n'est exposée au client.
+Le client ne doit **jamais** brancher sa logique sur le texte de `message`
+(traduisible, susceptible d'évoluer) mais sur `code`, dont le catalogue complet
+vit dans `src/common/errors/error-codes.ts` :
+
+| Domaine | Codes |
+| ------- | ----- |
+| Validation | `VALIDATION_ERROR`, `VALIDATION_REQUIRED`, `VALIDATION_INVALID_FORMAT`, `VALIDATION_INVALID_VALUE`, `VALIDATION_UNKNOWN_FIELD` |
+| Authentification | `AUTH_INVALID_CREDENTIALS`, `AUTH_SESSION_EXPIRED`, `AUTH_UNAUTHORIZED`, `AUTH_FORBIDDEN` |
+| Ressources | `RESOURCE_NOT_FOUND`, `RESOURCE_CONFLICT`, `RESOURCE_ALREADY_EXISTS`, `USER_EMAIL_ALREADY_EXISTS` |
+| Requête | `BAD_REQUEST`, `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_MEDIA_TYPE`, `TOO_MANY_REQUESTS` |
+| Serveur | `SERVER_ERROR`, `SERVER_UNAVAILABLE` |
+
+### 7.1 Validation indexée (rattacher l'erreur au bon champ)
+
+Une erreur de validation porte la liste **indexée** des champs fautifs, ce qui
+permet au mobile d'afficher l'erreur sous le bon champ — y compris dans une liste
+dynamique (`pointsGPS`) :
+
+```jsonc
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "message": "Certaines informations sont invalides.",
+  "fields": [
+    {
+      "field": "pointsGPS.0.latitude",           // chemin lisible
+      "path": ["pointsGPS", 0, "latitude"],   // chemin structuré
+      "code": "VALIDATION_INVALID_FORMAT",
+      "message": "Latitude invalide (entre -90 et 90)."
+    }
+  ]
+}
+```
+
+* un seul message par champ (la contrainte la plus significative) ;
+* messages **en français** : les DTO portent le vocabulaire métier, les
+  contraintes techniques (`@IsLatitude()`, `@IsNumber()`) sont traduites par
+  `common/validation/messages-validation.ts` — l'anglais par défaut de
+  class-validator ne sort jamais ;
+* les valeurs renvoyées sont tronquées (120 caractères) et jamais des objets.
+
+### 7.2 Statuts HTTP
+
+`200` requête traitée — `201` ressource créée — `204` sans contenu —
+`400` requête invalide — `401` non authentifié / identifiants invalides —
+`403` droits insuffisants — `404` ressource inexistante **ou appartenant à un
+autre utilisateur** (aucune fuite d'existence) — `409` conflit —
+`413` fichier trop volumineux (5 Mo) — `415` type de fichier refusé —
+`429` trop de requêtes — `500` erreur interne — `503` service indisponible.
+
+Les opérations qui ne créent aucune ressource répondent `200` :
+`POST /auth/login`, `POST /auth/logout`, `POST /auth/forgot-password`,
+`POST /auth/reset-password`, `POST /sync`, `POST /actions/sync`,
+`POST /actions/batch-sync`.
+
+Codes de base de données traduits : `23505` → 409
+`USER_EMAIL_ALREADY_EXISTS` (ou `RESOURCE_ALREADY_EXISTS`), `23503` → 409
+`RESOURCE_CONFLICT`. Les erreurs multer sont traduites
+(`LIMIT_FILE_SIZE` → 413 `PAYLOAD_TOO_LARGE`).
+Aucune stack trace, requête SQL ou message anglais n'est exposée au client.
+
+### 7.3 Configuration unique (`app.setup.ts`)
+
+CORS, validation, filtre d'erreurs, intercepteurs et dossier statique des
+uploads sont appliqués par `configurerApplication()` — appelée par `main.ts`
+**et** par les tests e2e. Les deux configurations avaient divergé (les tests ne
+validaient plus l'indexation des champs) : un test vert ne décrivait plus le
+comportement réel. Il n'y a plus qu'un seul endroit à modifier.
 
 ---
 
@@ -221,11 +290,13 @@ restent alignées.
 ## 9. Tests
 
 ```bash
-npm test                                  # 73 tests unitaires / 10 suites
-npm run test:e2e                          # 14 tests d'intégration / 2 suites (base réelle)
+npm test                                  # 86 tests unitaires / 12 suites
+npm run test:e2e                          # 17 tests d'intégration / 2 suites (base réelle)
 bash scripts/smoke-test.sh                # 38 vérifications (parcours complet, curl)
-bash scripts/smoke-dates.sh http://127.0.0.1:3000   # 24 assertions : contrat de dates,
+bash scripts/smoke-dates.sh http://127.0.0.1:3000   # 25 assertions : contrat de dates,
                                           # règles métier, synchronisation, cloisonnement
+bash scripts/qa-contrat-erreurs.sh        # 22 vérifications : codes d'erreur, champs
+                                          # indexés, statuts, uploads (415 / 413)
 ```
 
 `scripts/smoke-test.sh` couvre le parcours complet : inscription, parcelle et
@@ -233,7 +304,13 @@ délimitation, culture, interventions (statut automatique), observation, récolt
 (→ culture `RECOLTEE`), idempotence de la synchronisation, contrôle de propriété,
 suppression logique et mot de passe oublié.
 
-`scripts/smoke-dates.sh` (20 assertions, nécessite `jq`) vérifie ce que le mobile
+`scripts/qa-contrat-erreurs.sh` joue un client réel (curl) et vérifie ce que
+l'utilisateur observe : code et message d'un mot de passe erroné, email déjà
+utilisé, jeton absent, **index du tableau transmis** (`pointsGPS.0.latitude`),
+champ inconnu refusé, ressource d'un autre utilisateur masquée en 404, photo
+acceptée, fichier trop volumineux refusé en 413, faux JPEG refusé en 415.
+
+`scripts/smoke-dates.sh` (25 assertions, nécessite `jq`) vérifie ce que le mobile
 ne doit jamais calculer lui-même :
 
 * date métier refusant un instant ISO et une date non normalisée (400) ;
@@ -257,4 +334,7 @@ ne doit jamais calculer lui-même :
   pour les exceptions.
 * Validation stricte : `whitelist: true` + `forbidNonWhitelisted: true`
   (un champ inattendu provoque un 400).
+* Uploads : **extension et** type MIME doivent désigner une image
+  (`jpg`, `jpeg`, `png`, `webp`), taille limitée à 5 Mo, nom de fichier
+  régénéré côté serveur — le nom fourni par le client n'est jamais utilisé.
 * CORS restreint par `CORS_ORIGINS` ; `x-request-id` sur chaque réponse.

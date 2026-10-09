@@ -1,6 +1,3 @@
-/**
- * Fabrique de repository TypeORM simulé (tests unitaires).
- */
 export interface MockManager {
   transaction: jest.Mock;
   findOne: jest.Mock;

@@ -29,10 +29,6 @@ export class Culture extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   variete: string | null;
 
-  /**
-   * Date métier **sans heure** : colonne `date`, lue en `YYYY-MM-DD` par le
-   * pilote (`configurePgTypes`). Aucune conversion en `Date` → aucun décalage.
-   */
   @Column({ type: 'date', name: 'datePlantation', nullable: true })
   datePlantation: string | null;
 

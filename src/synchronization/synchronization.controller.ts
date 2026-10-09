@@ -13,10 +13,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
 
-/**
- * Endpoint de synchronisation canonique : POST /sync
- * Un alias POST /actions/sync est conservé pour les clients déjà déployés.
- */
 @Controller('sync')
 @UseGuards(JwtAuthGuard)
 export class SynchronizationController {

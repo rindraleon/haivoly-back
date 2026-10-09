@@ -1,12 +1,3 @@
-/**
- * Catalogue des codes d'erreur **partagés avec le mobile**.
- *
- * Règle : le mobile ne doit jamais dépendre du texte d'un message (il peut être
- * reformulé ou traduit) mais du `code`. Chaque code a une sémantique stable, et
- * un code HTTP associé côté filtre.
- *
- * Convention de nommage : `DOMAINE_REASON` en majuscules.
- */
 export const ErrorCode = {
   // ── Validation ────────────────────────────────────────────────
   VALIDATION_ERROR: 'VALIDATION_ERROR',
@@ -68,13 +59,6 @@ export function codeParStatut(status: number): ErrorCodeValue {
   }
 }
 
-/**
- * Traduit une exception métier en code précis.
- *
- * Les services lèvent déjà des messages français explicites ; on leur associe
- * ici le code que le mobile utilisera pour réagir (afficher l'erreur au bon
- * endroit, proposer une action…). Le `message` reste inchangé.
- */
 export function codePourMessage(
   message: string,
   status: number,
@@ -86,9 +70,6 @@ export function codePourMessage(
   }
   if (status === 401) {
     if (texte.includes('expir')) return ErrorCode.AUTH_SESSION_EXPIRED;
-    // « Email ou mot de passe incorrect » = tentative de connexion refusée ;
-    // tout autre 401 (jeton absent, invalide, compte supprimé) relève d'un
-    // défaut d'authentification, pas d'identifiants erronés.
     if (texte.includes('mot de passe') || texte.includes('identifiant')) {
       return ErrorCode.AUTH_INVALID_CREDENTIALS;
     }
@@ -99,14 +80,6 @@ export function codePourMessage(
   return codeParStatut(status);
 }
 
-/**
- * Traduit les messages techniques en messages utilisateur.
- *
- * `@nestjs/platform-express` transforme les erreurs multer en
- * `PayloadTooLargeException('File too large')` ; Nest lui-même génère des
- * messages anglais (`Unsupported Media Type`). Ces textes ne doivent jamais
- * s'afficher sur un écran : on les remplace par une phrase française.
- */
 const MESSAGE_VALIDATION_FR = 'Certaines informations sont invalides.';
 
 const MESSAGES_PAR_STATUT: Record<number, string> = {
@@ -134,10 +107,6 @@ const MESSAGES_TECHNIQUES: Record<string, string> = {
   'Validation failed': MESSAGE_VALIDATION_FR,
 };
 
-/**
- * Message destiné à l'utilisateur : français, sans jargon.
- * Un message déjà rédigé (métier, contrôlé) est conservé tel quel.
- */
 export function messageUtilisateur(message: string, status: number): string {
   const connu = MESSAGES_TECHNIQUES[message];
   if (connu) return connu;

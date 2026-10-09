@@ -12,11 +12,6 @@ export interface ApiSuccessBody<T> {
   message: string;
 }
 
-/**
- * Champs purement calendaires : ils sont toujours sérialisés en `YYYY-MM-DD`,
- * jamais en ISO complet. Cela évite le décalage d'un jour lors de l'affichage
- * côté mobile (le téléphone peut être en UTC+3, le serveur en UTC).
- */
 const DATE_ONLY_FIELDS = new Set([
   'datePlantation',
   'datePrevueRecolte',
@@ -60,18 +55,6 @@ function serializeEntity(
   return result;
 }
 
-/**
- * Enveloppe uniforme des réponses :
- * `{ success: true, data: ..., message: ... }`
- *
- * Elle applique aussi le **contrat de dates** de l'API :
- *   • colonnes calendaires (`datePlantation`, `datePrevueRecolte`,
- *     `dateRecolte`) → `YYYY-MM-DD`
- *   • horodatages → ISO-8601 UTC
- *
- * Les réponses qui déclarent déjà `success` (ex. `/health`) sont laissées
- * intactes pour ne pas être enveloppées deux fois.
- */
 @Injectable()
 export class TransformResponseInterceptor<T> implements NestInterceptor<
   T,

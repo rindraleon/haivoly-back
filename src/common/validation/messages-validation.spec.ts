@@ -1,6 +1,3 @@
-/**
- * Messages de validation : aucune phrase anglaise ne doit atteindre l'écran.
- */
 import {
   codeDeContrainte,
   estMessageParDefaut,

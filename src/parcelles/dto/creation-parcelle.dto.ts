@@ -21,11 +21,6 @@ export class PointGPSInputDto {
   @IsLongitude()
   longitude: number;
 
-  /**
-   * Position du sommet dans le polygone. **Optionnel** : lorsqu'il est omis,
-   * le serveur utilise l'ordre du tableau envoyé (contrat plus simple pour le
-   * mobile, qui n'a pas à numéroter les points).
-   */
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

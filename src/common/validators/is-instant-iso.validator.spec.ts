@@ -1,10 +1,3 @@
-/**
- * Tests du validateur `@IsInstantIso()`.
- *
- * Il garantit qu'une colonne `timestamp` ne reçoit jamais une date calendaire
- * nue : le serveur doit pouvoir comparer un instant à `now` (calcul du statut
- * des interventions) sans interprétation ambiguë.
- */
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 

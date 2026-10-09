@@ -1,11 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
-/**
- * Pagination standard : `page` (1-based) + `limit`.
- * `limit` est borné pour éviter qu'un client ne demande l'intégralité
- * d'une table.
- */
 export class PaginationQueryDto {
   @IsOptional()
   @Type(() => Number)

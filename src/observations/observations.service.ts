@@ -175,11 +175,6 @@ export class ObservationsService {
     return { id, deleted: true };
   }
 
-  /**
-   * Routes plates `/observations/:id` (utilisées par le mobile) : la culture
-   * est retrouvée à partir de l'observation, puis l'ownership est vérifié avec
-   * exactement la même règle que les routes imbriquées.
-   */
   async findOneById(id: string, utilisateurId: string): Promise<Observation> {
     const observation = await this.requireOwnedObservation(id, utilisateurId);
     return this.findOne(observation.cultureId, id, utilisateurId);

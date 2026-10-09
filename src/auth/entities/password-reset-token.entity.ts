@@ -10,11 +10,6 @@ import {
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Utilisateur } from '../../users/entities/utilisateur.entity';
 
-/**
- * Token de réinitialisation de mot de passe.
- * On ne stocke JAMAIS le token en clair : uniquement son hash SHA-256,
- * avec expiration et usage unique (`used`).
- */
 @Entity({ name: 'PasswordResetToken' })
 export class PasswordResetToken extends BaseEntity {
   @Index('PasswordResetToken_email_idx')

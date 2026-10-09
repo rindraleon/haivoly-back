@@ -1,15 +1,3 @@
-/**
- * Validation stricte des dates calendaires (`date-only`).
- *
- * Pourquoi un validateur dédié plutôt que `@IsDateString()` ?
- * `@IsDateString()` accepte aussi les instants ISO complets
- * (`2026-05-18T00:00:00.000Z`), ce qui laisse passer une date « décalée » d'un
- * jour selon le fuseau et masque les erreurs de conversion côté mobile.
- *
- * Ici on n'accepte QUE `YYYY-MM-DD`, et on vérifie que la date existe vraiment
- * (le 31/02 est refusé). Les champs réellement horodatés (intervention,
- * observation, `creeA`…) gardent `@IsDateString()` / `@IsISO8601()`.
- */
 import {
   registerDecorator,
   ValidationArguments,

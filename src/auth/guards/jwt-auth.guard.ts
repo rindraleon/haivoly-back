@@ -4,21 +4,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiException } from '../../common/errors/api-error';
 import { ErrorCode } from '../../common/errors/error-codes';
 
-/**
- * Garde d'authentification.
- *
- * Le mobile doit pouvoir distinguer trois situations que `UnauthorizedException`
- * confondait :
- *
- *   • **Session expirée** (`AUTH_SESSION_EXPIRED`) → déconnexion + invitation à
- *     se reconnecter, sans perdre les données saisies ;
- *   • **Non authentifié** (`AUTH_UNAUTHORIZED`) → jeton absent, invalide ou
- *     compte supprimé ;
- *   • **Identifiants erronés** (`AUTH_INVALID_CREDENTIALS`) → réservé à la
- *     connexion, jamais renvoyé par ce garde.
- *
- * Aucun détail technique (`JsonWebTokenError`, `jwt expired`) n'est exposé.
- */
 /** Texte exploitable extrait de l'information fournie par `passport-jwt`. */
 function infoTexte(info: unknown): string {
   if (typeof info === 'string') return info;

@@ -21,11 +21,6 @@ export class PointGPSDto {
   @IsLongitude({ message: 'Longitude invalide' })
   longitude: number;
 
-  /**
-   * Position du sommet dans le polygone. **Optionnel** : lorsqu'il est omis, le
-   * serveur utilise l'ordre du tableau envoyé — le mobile n'a donc pas à
-   * numéroter les points (même contrat que la création de parcelle).
-   */
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

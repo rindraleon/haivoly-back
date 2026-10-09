@@ -19,11 +19,6 @@ import type { PhotoIntervention } from '../../photos-interventions/entities/phot
 
 @Entity({ name: 'Intervention' })
 export class Intervention extends BaseEntity {
-  /**
-   * Colonne TEXT historiquement (le type PostgreSQL "TypeIntervention" existe
-   * mais n'est pas appliqué à cette colonne). On conserve donc `text` et la
-   * validation stricte se fait au niveau du DTO.
-   */
   @Column({ type: 'text' })
   type: TypeIntervention | string;
 
@@ -37,11 +32,6 @@ export class Intervention extends BaseEntity {
   })
   date: Date;
 
-  /**
-   * Statut calculé par le backend (voir intervention-status.util.ts).
-   * Colonne ajoutée par migration, valeur par défaut EN_COURS pour les
-   * enregistrements historiques (backfill ensuite selon la date).
-   */
   @Column({
     type: 'enum',
     enum: StatutIntervention,

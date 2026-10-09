@@ -119,9 +119,6 @@ export class ObservationsController {
     return this.observationsService.update(cultureId, id, dto, user.id);
   }
 
-  // ── Routes plates (mobile : `/observations/:id`) ───────────
-  // Ownership vérifié via `requireOwnedObservation`, identique aux routes
-  // imbriquées : aucune observation d'un autre utilisateur n'est accessible.
 
   @Get('observations/:id')
   findOneFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

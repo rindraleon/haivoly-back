@@ -48,20 +48,6 @@ export interface SyncResponse {
   changes: Record<string, unknown[]>;
 }
 
-/**
- * Moteur de synchronisation offline-first.
- *
- * Garanties :
- *  1. AUTH       — l'utilisateur est identifié par le JWT.
- *  2. OWNERSHIP  — chaque action est appliquée via un service qui vérifie
- *                  que la ressource appartient bien à l'utilisateur.
- *  3. IDEMPOTENCE— `Action.clientId` est UNIQUE : une action rejouée renvoie
- *                  DUPLICATE et n'exécute JAMAIS deux fois l'opération métier.
- *  4. STATUTS    — chaque action est journalisée (SYNCING → SYNCED/FAILED)
- *                  avec son nombre de tentatives.
- *  5. RETRY      — seules les actions en échec sont renvoyées au client, qui
- *                  peut rejouer uniquement celles-là.
- */
 @Injectable()
 export class SynchronizationService {
   private readonly logger = new Logger(SynchronizationService.name);
@@ -98,9 +84,6 @@ export class SynchronizationService {
     };
   }
 
-  // =========================================================
-  // APPLICATION D'UNE ACTION
-  // =========================================================
   private async applyAction(
     userId: string,
     action: CreateActionDto,
@@ -222,9 +205,6 @@ export class SynchronizationService {
     }
   }
 
-  // =========================================================
-  // DISPATCH PAR TYPE D'ENTITÉ
-  // =========================================================
   private async dispatch(
     userId: string,
     action: CreateActionDto,
@@ -543,9 +523,6 @@ export class SynchronizationService {
     return { entityId: parcelle?.id, data: parcelle };
   }
 
-  // =========================================================
-  // PULL — changements serveur depuis `lastSync`
-  // =========================================================
   private async pullChanges(
     userId: string,
     lastSync?: string,
@@ -613,9 +590,6 @@ export class SynchronizationService {
     return { parcelles, cultures, interventions, observations, recoltes };
   }
 
-  // =========================================================
-  // CONVERTISSEURS (payload mobile → DTO)
-  // =========================================================
   private toParcelleDto(
     payload: Record<string, unknown>,
     forcedId?: string,
@@ -728,9 +702,6 @@ export class SynchronizationService {
     };
   }
 
-  // =========================================================
-  // HELPERS
-  // =========================================================
   private readString(value: unknown): string | undefined {
     if (typeof value === 'string') {
       const trimmed = value.trim();

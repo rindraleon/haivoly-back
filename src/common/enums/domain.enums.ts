@@ -1,7 +1,3 @@
-/**
- * Enums métier — miroir exact des enums PostgreSQL existants.
- * Ne jamais renommer une valeur : elles sont persistées en base.
- */
 
 export enum Role {
   AGRICULTEUR = 'AGRICULTEUR',
@@ -34,11 +30,6 @@ export enum TypeIntervention {
   AUTRE = 'AUTRE',
 }
 
-/**
- * Statut d'une intervention.
- * Il est calculé automatiquement par le backend à partir de la date
- * (source de vérité) — il ne doit jamais être fourni par le client.
- */
 export enum StatutIntervention {
   PLANIFIEE = 'PLANIFIEE',
   EN_COURS = 'EN_COURS',

@@ -13,10 +13,6 @@ type AuthenticatedRequest = Request & {
   user?: { id?: string };
 };
 
-/**
- * Logging structuré : request id, user id, endpoint, statut, durée.
- * Ne journalise jamais les corps de requête (risque de fuite de mot de passe).
- */
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');

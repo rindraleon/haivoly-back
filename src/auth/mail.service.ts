@@ -7,13 +7,6 @@ export class MailService {
 
   constructor(private readonly configService: ConfigService) {}
 
-  /**
-   * Envoi de l'email de réinitialisation.
-   * Sans SMTP configuré, l'URL est journalisée (développement uniquement).
-   *
-   * Le point d'extension SMTP réel (Nodemailer / Resend / SES) se branche dans
-   * `deliver()`, ce qui garde cette méthode asynchrone et testable.
-   */
   sendPasswordResetEmail(email: string, resetUrl: string): Promise<void> {
     const smtpHost = this.configService.get<string>('SMTP_HOST');
     const appName = this.configService.get<string>('APP_NAME') ?? 'Haivoly';

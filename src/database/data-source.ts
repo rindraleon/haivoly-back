@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 // Doit précéder toute création de connexion (lecture UTC des dates).
 import './pg-types';
@@ -20,7 +22,23 @@ import { Action } from '../actions/entities/action.entity';
 import { Recommendation } from '../recommendations/entities/recommendation.entity';
 import { PasswordResetToken } from '../auth/entities/password-reset-token.entity';
 
-loadEnv();
+function loadEnvFile(): void {
+  loadEnv();
+
+  let dir = __dirname;
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = resolve(dir, '.env');
+    if (existsSync(candidate)) {
+      loadEnv({ path: candidate });
+      return;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return;
+    dir = parent;
+  }
+}
+
+loadEnvFile();
 
 export const entities = [
   Utilisateur,
@@ -39,12 +57,6 @@ export const entities = [
   PasswordResetToken,
 ];
 
-/**
- * Options partagées entre l'application (NestJS) et la CLI TypeORM.
- *
- * `synchronize` est TOUJOURS false : le schéma est piloté par des migrations
- * non destructives afin de préserver les données existantes.
- */
 export function buildDataSourceOptions(
   env: NodeJS.ProcessEnv = process.env,
 ): DataSourceOptions {

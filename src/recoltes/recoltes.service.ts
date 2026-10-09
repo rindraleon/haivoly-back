@@ -31,17 +31,6 @@ export class RecoltesService {
     private readonly photoRecoltes: Repository<PhotoRecolte>,
   ) {}
 
-  // =========================
-  // CREATE — règle métier transactionnelle
-  // =========================
-  /**
-   * Créer une récolte déclenche AUTOMATIQUEMENT le passage de la culture au
-   * statut RECOLTEE. Les deux écritures sont dans la même transaction :
-   * soit tout réussit, soit rien n'est appliqué.
-   *
-   * Le client ne peut donc jamais imposer `statut = RECOLTEE` à la place du
-   * backend.
-   */
   async create(
     cultureId: string,
     dto: CreateRecolteDto,
@@ -55,10 +44,6 @@ export class RecoltesService {
       throw new NotFoundException('Culture introuvable');
     }
 
-    // Une culture dont la date de plantation est atteinte est « en cours » :
-    // on applique la même règle serveur que la lecture des cultures, sans quoi
-    // une culture mûre resterait bloquée en PLANIFIEE et ne pourrait jamais
-    // être récoltée.
     const statutAJour = statutCultureAJour(
       culture.statut,
       culture.datePlantation,
@@ -79,9 +64,6 @@ export class RecoltesService {
     // (l'ordre lexicographique est identique à l'ordre chronologique).
     const dateRecolte = requireDateOnly(dto.dateRecolte, 'dateRecolte');
 
-    // `datePlantation` peut remonter soit en chaîne `YYYY-MM-DD`, soit en
-    // `Date` (selon l'hydratation TypeORM) : `toDateOnly` normalise les deux,
-    // sans jamais produire de décalage de fuseau.
     const plantation = toDateOnly(culture.datePlantation);
 
     if (plantation && dateRecolte < plantation) {
@@ -123,9 +105,6 @@ export class RecoltesService {
     });
   }
 
-  // =========================
-  // READ
-  // =========================
   async findAll(
     utilisateurId: string,
     page = 1,
@@ -182,13 +161,6 @@ export class RecoltesService {
     return recolte;
   }
 
-  // =========================
-  // UPDATE / DELETE — règles métier préservées
-  // =========================
-  /**
-   * Une récolte fait partie de l'historique d'une culture récoltée :
-   * sa modification est refusée (comportement métier historique conservé).
-   */
   async update(id: string, _dto: UpdateRecolteDto, utilisateurId: string) {
     await this.requireOwnedRecolte(id, utilisateurId);
     throw new BadRequestException(
@@ -204,9 +176,6 @@ export class RecoltesService {
     );
   }
 
-  // =========================
-  // PHOTOS
-  // =========================
   async uploadPhoto(recolteId: string, utilisateurId: string, url: string) {
     const recolte = await this.requireOwnedRecolte(recolteId, utilisateurId);
 

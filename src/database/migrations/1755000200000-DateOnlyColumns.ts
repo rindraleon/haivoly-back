@@ -1,23 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Types de colonnes calendaires — **correction du bug de fuseau horaire**.
- *
- * Les trois champs suivants ne portent aucune heure : ils passent de
- * `timestamp(3)` à `date`, ce qui rend la sémantique explicite côté base et
- * supprime toute possibilité de double conversion (mobile → API → PostgreSQL).
- *
- *   • `Culture.datePlantation`
- *   • `Culture.datePrevueRecolte`
- *   • `Recolte.dateRecolte`
- *
- * Migration **non destructive** :
- *   • la conversion utilise `AT TIME ZONE 'UTC'` : les valeurs historiques
- *     (écrites à minuit UTC) conservent exactement le même jour ;
- *   • aucune ligne n'est supprimée, aucun identifiant n'est modifié ;
- *   • l'opération est idempotente (elle ne fait rien si la colonne est déjà
- *     de type `date`).
- */
 export class DateOnlyColumns1755000200000 implements MigrationInterface {
   name = 'DateOnlyColumns1755000200000';
 

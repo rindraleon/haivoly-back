@@ -1,11 +1,3 @@
-/**
- * Tests du validateur `@IsDateOnly()`.
- *
- * Il verrouille le contrat de dates du backend : les dates métier sans heure
- * (`Culture.datePlantation`, `Culture.datePrevueRecolte`, `Recolte.dateRecolte`)
- * sont des chaînes `AAAA-MM-JJ`. Un instant ISO complet est refusé, car il
- * laisse passer un décalage d'un jour selon le fuseau du client.
- */
 import { plainToInstance } from 'class-transformer';
 import { IsDateOnly, estDateOnly } from './is-date-only.validator';
 import { validateSync } from 'class-validator';

@@ -1,15 +1,3 @@
-/**
- * Convention de dates Haivoly
- * ────────────────────────────
- * • Date métier sans heure  → "YYYY-MM-DD" (colonne PostgreSQL de type date
- *   ou timestamp 00:00:00Z selon le modèle existant).
- * • Date + heure            → ISO-8601 UTC "YYYY-MM-DDTHH:mm:ss.sssZ".
- *
- * Règles :
- *  1. On parse UNE seule fois (frontière du service) — jamais dans l'entité.
- *  2. On n'utilise `toISOString()` que pour sérialiser vers le client.
- *  3. Toute date invalide lève une erreur explicite plutôt que `Invalid Date`.
- */
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -45,13 +33,6 @@ export function requireDate(
   return parsed;
 }
 
-/**
- * Valide une date calendaire et la renvoie telle quelle (`YYYY-MM-DD`).
- *
- * Utilisée par les services dont la colonne PostgreSQL est de type `date` :
- * on ne convertit jamais en objet `Date`, ce qui élimine toute possibilité de
- * décalage de fuseau ou d'`Invalid Date`.
- */
 export function requireDateOnly(value: unknown, field: string): string {
   if (typeof value !== 'string' || !DATE_ONLY_REGEX.test(value)) {
     throw new DateParseError(field, value);

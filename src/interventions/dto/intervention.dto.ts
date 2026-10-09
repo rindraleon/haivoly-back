@@ -25,10 +25,6 @@ export class CreateInterventionDto {
   @MaxLength(1000)
   description?: string;
 
-  /**
-   * Date + heure **ISO-8601** (instant). Absente → maintenant.
-   * Le statut (`PLANIFIEE` / `EN_COURS`) est calculé par le serveur.
-   */
   @IsOptional()
   @IsInstantIso({
     message: 'La date de l’intervention doit être un instant ISO-8601',

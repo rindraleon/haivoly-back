@@ -17,14 +17,6 @@ import { calculerSuperficie } from '../common/utils/geo.util';
 import { statutCultureAJour } from '../common/utils/culture-statut.util';
 import type { PaginatedResult } from '../common/dto/pagination.dto';
 import { paginate } from '../common/dto/pagination.dto';
-/**
- * Cycle de vie d'une culture — transitions autorisées.
- * PLANIFIEE → EN_COURS (démarrage) | ABANDONNEE | SUPPRIMEE
- * EN_COURS  → RECOLTEE (automatique lors de la création d'une récolte)
- * ABANDONNEE→ PLANIFIEE | SUPPRIMEE
- * RECOLTEE  → (terminal)
- * SUPPRIMEE → (terminal)
- */
 const TRANSITIONS_AUTORISEES: Record<StatutCulture, StatutCulture[]> = {
   [StatutCulture.PLANIFIEE]: [
     StatutCulture.EN_COURS,
@@ -50,9 +42,6 @@ export class CulturesService {
     @InjectRepository(Recolte)
     private readonly recoltes: Repository<Recolte>,
   ) {}
-  // =========================
-  // OWNERSHIP
-  // =========================
   async requireOwnership(
     cultureId: string,
     utilisateurId: string,
@@ -74,9 +63,6 @@ export class CulturesService {
     }
     return culture;
   }
-  // =========================
-  // CREATE
-  // =========================
   async create(
     parcelleId: string,
     dto: CreateCultureDto,
@@ -131,9 +117,6 @@ export class CulturesService {
       await this.cultures.findOne({ where: { id: saved.id } }),
     );
   }
-  // =========================
-  // READ
-  // =========================
   async findAll(
     parcelleId: string,
     utilisateurId: string,
@@ -197,9 +180,6 @@ export class CulturesService {
       recolte,
     };
   }
-  // =========================
-  // UPDATE
-  // =========================
   async update(
     parcelleId: string,
     id: string,
@@ -258,9 +238,6 @@ export class CulturesService {
     }
     return this.findOne(parcelleId, id, utilisateurId);
   }
-  // =========================
-  // DELETE (logique)
-  // =========================
   async remove(
     parcelleId: string,
     id: string,
@@ -279,9 +256,6 @@ export class CulturesService {
     await this.cultures.save(culture);
     return culture;
   }
-  // =========================
-  // POINTS GPS DE LA CULTURE
-  // =========================
   async findPointsGPS(
     parcelleId: string,
     cultureId: string,
@@ -331,16 +305,6 @@ export class CulturesService {
     if (points.length < 3) return null;
     return calculerSuperficie(points);
   }
-  // =========================
-  // CYCLE DE VIE
-  // =========================
-  /**
-   * Applique la règle « date de plantation atteinte → culture en cours ».
-   *
-   * Appelée à la création et à chaque lecture : le statut renvoyé au mobile est
-   * donc toujours cohérent avec la date, sans que le client ait à le calculer.
-   * L'écriture n'a lieu que si le statut change réellement.
-   */
   private async reconcilierStatut<T extends Culture | null | undefined>(
     culture: T,
   ): Promise<T> {
@@ -383,9 +347,6 @@ export class CulturesService {
     return items;
   }
 
-  // =========================
-  // TRANSITIONS
-  // =========================
   private verifierTransitionStatut(
     actuel: StatutCulture,
     nouveau: StatutCulture,

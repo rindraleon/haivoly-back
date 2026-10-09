@@ -18,12 +18,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../common/decorators/current-user.decorator';
 
-/**
- * Les interventions sont rattachées à une culture, elle-même rattachée à une
- * parcelle. Les routes imbriquées historiques sont conservées ; les routes
- * courtes `/cultures/:cultureId/interventions` sont ajoutées pour le mobile
- * (elles vérifient l'ownership de la même manière).
- */
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class InterventionsController {
@@ -142,9 +136,6 @@ export class InterventionsController {
     return this.interventionsService.remove(cultureId, id, user.id);
   }
 
-  // ── Routes plates (mobile : `/interventions/:id`) ──────────
-  // Même contrôle d'ownership : la culture est retrouvée à partir de
-  // l'intervention puis vérifiée comme propriété de l'utilisateur.
 
   @Get('interventions/:id')
   findOneFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {

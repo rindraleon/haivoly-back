@@ -1,35 +1,3 @@
-/**
- * Indexation des erreurs de validation.
- *
- * `ValidationPipe` renvoie des `ValidationError` **imbriquées** (objets, tableaux
- * d'objets). Le mobile a besoin de savoir *quel champ* corriger : on aplatit donc
- * l'arbre en une liste de champs fautifs, chacun identifié par
- *
- *   • `field` : chemin lisible et pointé, index compris — `pointsGPS.0.latitude` ;
- *   • `path`  : le même chemin sous forme structurée — `['pointsGPS', 0, 'latitude']`
- *               (utilisable directement pour localiser l'élément dans un
- *               formulaire dynamique, sans re-parser une chaîne) ;
- *   • `code`  : nature de l'erreur (obligatoire, format, valeur…) ;
- *   • `message`: message français prêt à afficher ;
- *   • `value` : valeur refusée, quand elle est sûre à exposer.
- *
- * Contrat renvoyé au client (corps de la réponse) :
- *
- * ```json
- * {
- *   "success": false,
- *   "statusCode": 400,
- *   "code": "VALIDATION_ERROR",
- *   "message": "Certaines informations sont invalides",
- *   "fields": [
- *     { "field": "email", "path": ["email"], "code": "VALIDATION_INVALID_FORMAT",
- *       "message": "Email invalide" },
- *     { "field": "pointsGPS.1.latitude", "path": ["pointsGPS", 1, "latitude"],
- *       "code": "VALIDATION_REQUIRED", "message": "La latitude est obligatoire" }
- *   ]
- * }
- * ```
- */
 import type { ValidationError } from '@nestjs/common';
 
 import { ErrorCode, type ErrorCodeValue } from '../errors/error-codes';
@@ -70,13 +38,6 @@ function valeurExposable(value: unknown): unknown {
   return undefined;
 }
 
-/**
- * Aplatit l'arbre `ValidationError[]` en champs fautifs indexés.
- *
- * Un même champ peut cumuler plusieurs contraintes : on conserve la **première**
- * (la plus significative, class-validator les expose dans l'ordre de déclaration)
- * pour ne pas afficher trois messages sous un seul champ.
- */
 export function champsInvalides(
   erreurs: ValidationError[],
   prefixe: (string | number)[] = [],

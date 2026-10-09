@@ -1,24 +1,9 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * MIGRATION BASELINE — NON DESTRUCTIVE
- * ────────────────────────────────────
- * Reproduit exactement le schéma PostgreSQL produit historiquement par les
- * migrations Prisma (noms de tables, colonnes, enums, index et contraintes
- * compris), mais de façon IDEMPOTENTE :
- *
- *   • base neuve            → crée tout le schéma
- *   • base déjà existante   → aucune opération (IF NOT EXISTS), données intactes
- *
- * Aucun DROP, aucun TRUNCATE, aucun ALTER destructif.
- */
 export class InitialSchema1730000000000 implements MigrationInterface {
   name = 'InitialSchema1730000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // ─────────────────────────────────────────────────────────────
-    // 1. Enum types
-    // ─────────────────────────────────────────────────────────────
     await queryRunner.query(`
       DO $$ BEGIN
         CREATE TYPE "Role" AS ENUM ('AGRICULTEUR', 'PROPRIETAIRE');
@@ -43,9 +28,6 @@ export class InitialSchema1730000000000 implements MigrationInterface {
       EXCEPTION WHEN duplicate_object THEN NULL; END $$;
     `);
 
-    // ─────────────────────────────────────────────────────────────
-    // 2. Tables
-    // ─────────────────────────────────────────────────────────────
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "Utilisateur" (
         "id" TEXT NOT NULL,
@@ -249,9 +231,6 @@ export class InitialSchema1730000000000 implements MigrationInterface {
       );
     `);
 
-    // ─────────────────────────────────────────────────────────────
-    // 3. Index & contraintes uniques
-    // ─────────────────────────────────────────────────────────────
     await queryRunner.query(
       `CREATE UNIQUE INDEX IF NOT EXISTS "Utilisateur_email_key" ON "Utilisateur" ("email");`,
     );
@@ -332,9 +311,6 @@ export class InitialSchema1730000000000 implements MigrationInterface {
       `CREATE INDEX IF NOT EXISTS "IDX_PhotoRecolte_recolteId" ON "PhotoRecolte" ("recolteId");`,
     );
 
-    // ─────────────────────────────────────────────────────────────
-    // 4. Clés étrangères (ajoutées seulement si absentes)
-    // ─────────────────────────────────────────────────────────────
     const foreignKeys: Array<[string, string]> = [
       [
         'Parcelle_utilisateurId_fkey',

@@ -9,10 +9,6 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 
-/**
- * Contrôle de rôle côté serveur (le masquage côté mobile n'est qu'un confort
- * d'UX, jamais une sécurité).
- */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

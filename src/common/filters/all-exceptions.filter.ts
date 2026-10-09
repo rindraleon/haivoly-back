@@ -32,10 +32,6 @@ export interface ApiErrorBody {
   timestamp: string;
 }
 
-/**
- * Filtre global : normalise TOUTES les erreurs sortantes.
- * Aucune stack trace ni détail technique n'est exposé au client.
- */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionFilter');
@@ -80,9 +76,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
     details?: unknown;
     fields?: ChampInvalide[];
   } {
-    // Fichier refusé par multer (taille, champ inattendu) : on traduit en
-    // message utilisateur et en code exploitable plutôt que de laisser fuiter
-    // « MulterError: File too large ».
     if (exception instanceof MulterError) {
       if (exception.code === 'LIMIT_FILE_SIZE') {
         return {
@@ -140,9 +133,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
         { code?: string } | undefined;
       const code = driverError?.code;
 
-      // 23505 = violation d'unicité, 23503 = violation de clé étrangère
-      // 23505 = violation d'unicité → conflit explicite (l'email est le seul
-      // index unique exposé par l'API, d'où le code dédié).
       if (code === '23505') {
         const detail = JSON.stringify(
           (exception.driverError as { detail?: string } | undefined)?.detail ??

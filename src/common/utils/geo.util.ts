@@ -3,10 +3,6 @@ export interface PointGeo {
   longitude: number;
 }
 
-/**
- * Calcule la superficie d'une parcelle/culture en m² à partir de ses points GPS.
- * Minimum 3 points. Formule géodésique (sphère de rayon terrestre moyen).
- */
 export function calculerSuperficie(points: PointGeo[]): number {
   if (points.length < 3) {
     throw new Error(

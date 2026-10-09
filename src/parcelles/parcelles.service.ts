@@ -40,9 +40,6 @@ export class ParcellesService {
     private readonly parcelles: Repository<Parcelle>,
   ) {}
 
-  // =========================
-  // CREATE
-  // =========================
   async create(dto: CreateParcelleDto, utilisateurId: string) {
     return this.parcelles.manager.transaction(async (manager) => {
       const points = dto.pointsGPS ?? [];
@@ -58,9 +55,6 @@ export class ParcellesService {
         utilisateurId,
       });
 
-      // Si une délimitation est fournie dès la création, on en déduit
-      // superficie + point d'ancrage (centre) afin que la carte mobile
-      // soit immédiatement positionnée sur la parcelle.
       if (points.length >= 3) {
         const geometrie = points.map((p) => ({
           latitude: p.latitude,
@@ -101,9 +95,6 @@ export class ParcellesService {
     });
   }
 
-  // =========================
-  // READ (liste)
-  // =========================
   async findAll(
     utilisateurId: string,
     page = 1,
@@ -128,17 +119,10 @@ export class ParcellesService {
     return paginate(items, total, page, limit);
   }
 
-  // =========================
-  // READ (détail)
-  // =========================
   async findOne(id: string, utilisateurId: string): Promise<Parcelle> {
     return this.requireOwnership(id, utilisateurId, { withPoints: true });
   }
 
-  /**
-   * Vérification d'ownership centralisée : un utilisateur ne peut jamais
-   * accéder à la ressource d'un autre, même en connaissant son identifiant.
-   */
   async requireOwnership(
     id: string,
     utilisateurId: string,
@@ -165,9 +149,6 @@ export class ParcellesService {
     return parcelle;
   }
 
-  // =========================
-  // UPDATE
-  // =========================
   async update(id: string, dto: UpdateParcelleDto, utilisateurId: string) {
     const parcelle = await this.requireOwnership(id, utilisateurId, {
       withPoints: false,
@@ -218,9 +199,6 @@ export class ParcellesService {
     return this.findOne(id, utilisateurId);
   }
 
-  // =========================
-  // ADD POINTS GPS
-  // =========================
   async addPointsGPS(
     parcelleId: string,
     pointsGPS: { latitude: number; longitude: number; ordre?: number }[],
@@ -259,9 +237,6 @@ export class ParcellesService {
     });
   }
 
-  // =========================
-  // UPDATE DELIMITATION
-  // =========================
   async updateDelimitation(
     parcelleId: string,
     dto: ModifierDelimitationDto,
@@ -342,9 +317,6 @@ export class ParcellesService {
     });
   }
 
-  // =========================
-  // DELETE (suppression logique)
-  // =========================
   async remove(id: string, raison: string, utilisateurId: string) {
     const parcelle = await this.requireOwnership(id, utilisateurId, {
       withPoints: false,
@@ -372,14 +344,6 @@ export class ParcellesService {
     return { ...parcelle, pointsGPS: [] };
   }
 
-  // =========================
-  // HELPERS
-  // =========================
-  /**
-   * Les points GPS sont toujours renvoyés triés par `ordre`.
-   * Le tri est fait en mémoire : `findOne` applique un `take(1)` interne qui
-   * empêche TypeORM de trier sur une relation (« distinctAlias »).
-   */
   private sortPoints(parcelle: Parcelle | null): Parcelle | null {
     if (parcelle?.pointsGPS) {
       parcelle.pointsGPS.sort((a, b) => a.ordre - b.ordre);

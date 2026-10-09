@@ -1,16 +1,5 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Statut automatique des interventions.
- * ────────────────────────────────────
- * Ajoute la colonne `statut` à "Intervention" et la renseigne à partir de la
- * date de l'intervention :
- *
- *   date > maintenant  → PLANIFIEE
- *   date <= maintenant → EN_COURS
- *
- * Non destructif : ADD COLUMN IF NOT EXISTS + backfill idempotent.
- */
 export class InterventionStatut1730000001000 implements MigrationInterface {
   name = 'InterventionStatut1730000001000';
 

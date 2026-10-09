@@ -3,12 +3,6 @@ export interface PointGeo {
   longitude: number;
 }
 
-/**
- * Calcule la superficie d'une parcelle en m²
- * à partir de ses points GPS.
- *
- * Minimum : 3 points
- */
 export function calculerSuperficie(points: PointGeo[]): number {
   if (points.length < 3) {
     throw new Error(

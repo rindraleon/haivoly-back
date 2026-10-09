@@ -31,9 +31,6 @@ export class InterventionsService {
     private readonly cultures: Repository<Culture>,
   ) {}
 
-  // =========================
-  // VÉRIFICATION D'OWNERSHIP + ÉTAT DE LA CULTURE
-  // =========================
   private async requireCulture(
     parcelleIdFromRoute: string | undefined,
     cultureId: string,
@@ -65,9 +62,6 @@ export class InterventionsService {
     }
   }
 
-  // =========================
-  // CREATE
-  // =========================
   async create(
     cultureId: string,
     dto: CreateInterventionDto,
@@ -105,9 +99,6 @@ export class InterventionsService {
     return saved;
   }
 
-  // =========================
-  // READ
-  // =========================
   async findAll(
     cultureId: string,
     utilisateurId: string,
@@ -144,11 +135,6 @@ export class InterventionsService {
     return intervention;
   }
 
-  /**
-   * Routes plates `/interventions/:id` (utilisées par le mobile) : la culture
-   * n'est pas dans l'URL, on la retrouve à partir de l'intervention puis on
-   * applique **le même contrôle d'ownership** que les routes imbriquées.
-   */
   private async cultureIdDe(
     id: string,
     utilisateurId: string,
@@ -201,9 +187,6 @@ export class InterventionsService {
     return this.interventions.findOne({ where: { id } });
   }
 
-  // =========================
-  // UPDATE
-  // =========================
   async update(
     cultureId: string,
     id: string,
@@ -252,9 +235,6 @@ export class InterventionsService {
     return this.interventions.save(intervention);
   }
 
-  // =========================
-  // DELETE
-  // =========================
   async remove(
     cultureId: string,
     id: string,
@@ -281,11 +261,6 @@ export class InterventionsService {
     return { id, deleted: true };
   }
 
-  /**
-   * Normalise les statuts des interventions d'une culture.
-   * Appelé à la lecture : une intervention planifiée dont la date est dépassée
-   * devient EN_COURS sans intervention manuelle.
-   */
   private async normalizeAll(
     interventions: Intervention[],
   ): Promise<Intervention[]> {

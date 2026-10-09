@@ -9,10 +9,6 @@ export interface AuthenticatedUser {
   role: string;
 }
 
-/**
- * Injecte l'utilisateur authentifié (résolu par la stratégie JWT).
- * Usage : `@CurrentUser() user: AuthenticatedUser`
- */
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AuthenticatedUser => {
     const request = ctx

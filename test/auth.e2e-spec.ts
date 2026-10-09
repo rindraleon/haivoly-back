@@ -5,10 +5,6 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { configurerApplication } from '../src/app.setup';
 
-/**
- * Tests e2e — nécessitent une base PostgreSQL accessible via DATABASE_URL
- * (voir .env.example → DATABASE_URL_TEST).
- */
 describe('Parcours complet API (e2e)', () => {
   let app: NestExpressApplication;
   let token: string;

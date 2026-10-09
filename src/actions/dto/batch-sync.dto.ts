@@ -20,11 +20,6 @@ export class BatchSyncDto {
   actions: CreateActionDto[];
 }
 
-/**
- * Payload canonique de POST /sync.
- * `deviceId` identifie l'appareil, `lastSync` permet de ne récupérer que les
- * changements serveur postérieurs.
- */
 export class SyncDto extends BatchSyncDto {
   @IsOptional()
   @IsString()

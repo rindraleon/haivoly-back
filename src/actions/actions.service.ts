@@ -37,10 +37,6 @@ export class ActionsService {
     private readonly utilisateurs: Repository<Utilisateur>,
   ) {}
 
-  /**
-   * Enregistre une action déjà appliquée côté métier (mode online).
-   * L'idempotence est garantie par l'index unique sur `clientId`.
-   */
   async create(userId: string, dto: CreateActionDto) {
     if (dto.clientId) {
       const existing = await this.actions.findOne({
@@ -193,14 +189,6 @@ export class ActionsService {
     return 'sans nom';
   }
 
-  // =========================================================
-  // RÈGLES DE RECOMMANDATION (extensibles)
-  // =========================================================
-  /**
-   * Chaque règle reçoit le contexte d'une action et peut générer une
-   * recommandation. Une règle qui échoue n'interrompt jamais la
-   * synchronisation.
-   */
   async triggerRecommendationRules(context: {
     userId: string;
     actionType: string;

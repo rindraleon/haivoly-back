@@ -1,14 +1,3 @@
-/**
- * Validation stricte des horodatages (`timestamp`) : ils doivent être des
- * instants ISO-8601 complets.
- *
- * Complément de `@IsDateOnly()` : un même champ ne doit jamais pouvoir être
- * interprété de deux façons. Pour une colonne `timestamp`
- * (`Intervention.date`, `Observation.date`), on exige donc
- * `AAAA-MM-JJTHH:mm:ss(.sss)?Z` (ou un décalage explicite `+03:00`) — une
- * simple date calendaire est refusée, car le serveur doit comparer un instant
- * à `now` pour calculer les statuts.
- */
 import {
   registerDecorator,
   ValidationArguments,

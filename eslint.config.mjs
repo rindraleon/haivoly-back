@@ -33,10 +33,6 @@ export default tseslint.config(
     },
   },
   {
-    // ── Fichiers de test ──────────────────────────────────────────────
-    // Supertest et les mocks Jest renvoient des `any` : les règles de
-    // « typed lint » y génèrent du bruit sans valeur ajoutée sur la
-    // sécurité. Les règles de correction, elles, restent actives.
     files: ['**/*.spec.ts', '**/*.e2e-spec.ts', 'src/test-utils/**/*.ts'],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',

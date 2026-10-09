@@ -15,24 +15,8 @@ export const ALLOWED_IMAGE_MIME_TYPES = [
   'image/png',
   'image/webp',
 ];
-/**
- * Taille maximale d'une image reçue.
- *
- * Le mobile **compresse la photo avant l'envoi** (1920 px de côté maximum,
- * JPEG qualité 0,82 — voir `mobile/src/utils/image.ts`) : une photo de
- * téléphone passe ainsi de 3–8 Mo à 200–600 Ko. La limite serveur reste un
- * garde-fou pour les clients tiers, elle n'est jamais atteinte par l'application.
- */
 export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024; // 5 Mo
 
-/**
- * Configuration multer partagée par tous les endpoints d'upload.
- * Les fichiers sont stockés dans `./uploads/<folder>`.
- *
- * Double contrôle : l'**extension** et le **type MIME** déclarés doivent être
- * ceux d'une image. Un fichier renommé `photo.jpg` mais déclaré
- * `application/x-sh` est refusé (415).
- */
 export function imageUploadOptions(
   folder: 'observations' | 'interventions' | 'recoltes',
   prefix: string,
@@ -70,13 +54,6 @@ export function imageUploadOptions(
   };
 }
 
-/**
- * Normalise l'URL d'une photo :
- *  • URL absolue pointant vers nos uploads → chemin relatif (évite de figer
- *    une adresse IP ou un domaine dans la base) ;
- *  • URL externe → conservée telle quelle ;
- *  • chemin relatif valide → conservé.
- */
 export function normalizeUploadUrl(
   value: string | undefined,
   folder: 'observations' | 'interventions' | 'recoltes',

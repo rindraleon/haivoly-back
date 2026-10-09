@@ -9,11 +9,6 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { configurerApplication, journaliserDemarrage } from './app.setup';
 
-/**
- * Point d'entrée : SEULE responsabilité, démarrer le serveur.
- * Toute la configuration (CORS, validation, filtres, statique) est définie
- * dans `app.setup.ts`, partagée avec les tests e2e.
- */
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: false,

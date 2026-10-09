@@ -1,17 +1,3 @@
-/**
- * Messages de validation en français, compréhensibles par l'utilisateur final.
- *
- * Les DTO déclarent leurs messages métier (`@IsNotEmpty({ message: 'Le nom de la
- * parcelle est obligatoire' })`). Pour les décorateurs sans message — les
- * contraintes « techniques » comme `@IsLatitude()` — class-validator génère un
- * message anglais du type `latitude must be a latitude string or number`, qui ne
- * doit jamais atteindre l'écran.
- *
- * On détecte ces messages par défaut (ils commencent par le nom de la
- * propriété, `each` pour les tableaux) et on les remplace par une phrase
- * française. Les messages explicites des DTO sont conservés **tels quels** :
- * ils portent le vocabulaire métier.
- */
 import type { ErrorCodeValue } from '../errors/error-codes';
 import { ErrorCode } from '../errors/error-codes';
 
@@ -62,12 +48,6 @@ const MESSAGES: Record<string, string> = {
   isNegative: 'La valeur doit être négative.',
 };
 
-/**
- * Vrai si le message vient de class-validator et n'a pas été personnalisé.
- *
- * Les messages par défaut commencent toujours par le nom de la propriété :
- * `latitude must be a latitude string or number`, `each value in pointsGPS …`.
- */
 export function estMessageParDefaut(
   message: string,
   propriete: string,
@@ -116,13 +96,6 @@ export function codeDeContrainte(contrainte: string): ErrorCodeValue {
   return ErrorCode.VALIDATION_INVALID_VALUE;
 }
 
-/**
- * Message affichable pour un champ fautif.
- *
- * @param contrainte nom de la contrainte class-validator (`isLatitude`…)
- * @param propriete  nom de la propriété du DTO (`latitude`…)
- * @param message    message éventuel déclaré dans le DTO
- */
 export function messageChamp(
   contrainte: string,
   propriete: string,

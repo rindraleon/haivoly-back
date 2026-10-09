@@ -28,10 +28,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  /**
-   * L'utilisateur est rechargé à chaque requête : un compte supprimé ou
-   * un token forgé ne peut donc pas accéder aux ressources.
-   */
   async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     if (!payload?.sub) {
       throw new UnauthorizedException('Token invalide');

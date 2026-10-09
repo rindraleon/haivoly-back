@@ -45,9 +45,6 @@ class ListeCulturesQueryDto extends PaginationQueryDto {
 export class CulturesController {
   constructor(private readonly culturesService: CulturesService) {}
 
-  // =========================================================
-  // Vues transverses (toutes les cultures de l'utilisateur)
-  // =========================================================
   @Get('cultures')
   findAllForUser(
     @Query() query: ListeCulturesQueryDto,
@@ -61,9 +58,6 @@ export class CulturesController {
     );
   }
 
-  // =========================================================
-  // Cultures d'une parcelle
-  // =========================================================
   @Post('parcelles/:parcelleId/cultures')
   create(
     @Param('parcelleId') parcelleId: string,
@@ -122,9 +116,6 @@ export class CulturesController {
     return this.culturesService.remove(parcelleId, id, user.id, dto?.raison);
   }
 
-  // =========================================================
-  // Délimitation GPS d'une culture
-  // =========================================================
   @Get('parcelles/:parcelleId/cultures/:id/points-gps')
   findPointsGPS(
     @Param('parcelleId') parcelleId: string,

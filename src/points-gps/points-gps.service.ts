@@ -6,10 +6,6 @@ import { PointGPS } from './entities/point-gps.entity';
 import { Parcelle } from '../parcelles/entities/parcelle.entity';
 import { calculerSuperficie, centroide } from '../common/utils/geo.util';
 
-/**
- * Service dédié aux points GPS géographiques des parcelles.
- * Utilisé par le module de synchronisation et par ParcellesService.
- */
 @Injectable()
 export class PointsGpsService {
   constructor(
@@ -24,10 +20,6 @@ export class PointsGpsService {
     });
   }
 
-  /**
-   * Remplace la délimitation d'une parcelle puis recalcule superficie et
-   * point d'ancrage. Peut s'exécuter dans une transaction existante.
-   */
   async replaceForParcelle(
     manager: EntityManager,
     parcelleId: string,

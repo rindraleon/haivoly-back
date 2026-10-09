@@ -57,9 +57,6 @@ export class AuthService {
     };
   }
 
-  // =========================
-  // REGISTER
-  // =========================
   async register(dto: RegisterDto): Promise<PublicUtilisateur> {
     const email = dto.email.toLowerCase().trim();
 
@@ -82,9 +79,6 @@ export class AuthService {
     return this.toPublic(saved);
   }
 
-  // =========================
-  // LOGIN
-  // =========================
   async login(dto: LoginDto): Promise<{
     access_token: string;
     utilisateur: PublicUtilisateur;
@@ -115,22 +109,11 @@ export class AuthService {
     return { access_token, utilisateur: this.toPublic(utilisateur) };
   }
 
-  // =========================
-  // LOGOUT
-  // =========================
-  /**
-   * Les JWT sont stateless : la révocation est gérée côté client
-   * (suppression du token du SecureStore). Cet endpoint existe pour que le
-   * mobile dispose d'un point d'appel explicite et journalisé.
-   */
   logout(user: AuthenticatedUser): { message: string } {
     this.logger.log(`[logout] ${user.id}`);
     return { message: 'Déconnexion réussie' };
   }
 
-  // =========================
-  // CURRENT USER
-  // =========================
   async me(user: AuthenticatedUser): Promise<PublicUtilisateur> {
     const utilisateur = await this.utilisateurs.findOne({
       where: { id: user.id },
@@ -143,9 +126,6 @@ export class AuthService {
     return this.toPublic(utilisateur);
   }
 
-  // =========================
-  // FORGOT PASSWORD
-  // =========================
   async forgotPassword(rawEmail: string) {
     const email = rawEmail.toLowerCase().trim();
 
@@ -199,9 +179,6 @@ export class AuthService {
     return genericResponse;
   }
 
-  // =========================
-  // RESET PASSWORD
-  // =========================
   async resetPassword(
     token: string,
     newPassword: string,

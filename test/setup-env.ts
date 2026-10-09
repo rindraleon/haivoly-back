@@ -1,8 +1,3 @@
-/**
- * Charge les variables d'environnement pour les tests e2e.
- * `DATABASE_URL_TEST` doit pointer vers une base dédiée (ne jamais exécuter
- * les tests e2e sur la base de production).
- */
 import { config } from 'dotenv';
 
 config();

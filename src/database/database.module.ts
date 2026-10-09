@@ -5,10 +5,6 @@ import { DataSource } from 'typeorm';
 
 import { buildDataSourceOptions } from './data-source';
 
-/**
- * Point d'entrée unique de la base de données.
- * Aucun autre module ne doit instancier de DataSource / Repository "à la main".
- */
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({

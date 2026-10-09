@@ -12,11 +12,6 @@ import { BaseEntity } from '../../common/entities/base.entity';
 import { SyncStatus } from '../../common/enums/domain.enums';
 import { Utilisateur } from '../../users/entities/utilisateur.entity';
 
-/**
- * Journal d'actions synchronisées depuis le mobile.
- * `clientId` est UNIQUE → garantit l'idempotence (une action rejouée
- * ne crée jamais deux opérations métier).
- */
 @Entity({ name: 'Action' })
 export class Action extends BaseEntity {
   @Index('Action_clientId_key', { unique: true })

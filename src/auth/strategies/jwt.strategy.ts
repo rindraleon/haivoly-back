@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -7,8 +7,6 @@ import { Repository } from 'typeorm';
 
 import { Utilisateur } from '../../users/entities/utilisateur.entity';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { ApiException } from '../../common/errors/api-error';
-import { ErrorCode } from '../../common/errors/error-codes';
 
 export interface JwtPayload {
   sub: string;
@@ -19,7 +17,7 @@ export interface JwtPayload {
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
-    private readonly configService: ConfigService,
+    configService: ConfigService,
     @InjectRepository(Utilisateur)
     private readonly utilisateurs: Repository<Utilisateur>,
   ) {
@@ -41,18 +39,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!utilisateur) {
       throw new UnauthorizedException('Utilisateur introuvable');
-    }
-
-    const verificationRequise =
-      this.configService
-        .get<string>('EMAIL_VERIFICATION_REQUISE')
-        ?.toLowerCase() !== 'false';
-    if (verificationRequise && !utilisateur.estVerifie) {
-      throw new ApiException(
-        ErrorCode.AUTH_EMAIL_NOT_VERIFIED,
-        'Votre adresse e-mail n’a pas encore été confirmée. Consultez votre boîte de réception pour activer votre compte.',
-        HttpStatus.FORBIDDEN,
-      );
     }
 
     return {

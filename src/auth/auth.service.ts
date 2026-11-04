@@ -63,8 +63,6 @@ const RESEND_COOLDOWN_MS = 60 * 1000;
 const MESSAGE_EMAIL_JETABLE =
   'Les adresses e-mail temporaires ou jetables ne sont pas acceptées. Utilisez une adresse durable.';
 const MESSAGE_EMAIL_INVALIDE = 'Adresse e-mail invalide.';
-const MESSAGE_COMPTE_NON_VERIFIE =
-  'Votre adresse e-mail n’a pas encore été confirmée. Consultez votre boîte de réception (et vos courriers indésirables) pour activer votre compte.';
 const MESSAGE_MOT_DE_PASSE_PROVISOIRE =
   'Définissez votre mot de passe personnel avant de continuer : votre compte a été créé par un responsable.';
 
@@ -104,11 +102,6 @@ export class AuthService {
         'EMAIL_DOMAINES_JETABLES_IGNORES',
       ),
     });
-  }
-
-  private get verificationRequise(): boolean {
-    const brut = this.configService.get<string>('EMAIL_VERIFICATION_REQUISE');
-    return brut === undefined ? true : brut.toLowerCase() !== 'false';
   }
 
   /** Ne jamais renvoyer le hash du mot de passe, ni un jeton, ni un secret. */
@@ -164,8 +157,6 @@ export class AuthService {
       );
     }
 
-    const verificationRequise = this.verificationRequise;
-
     const saved = await this.usernames.avecRepriseSurCollision(
       { nom: dto.nom, prenom: dto.prenom, email },
       async (username) => {
@@ -178,8 +169,8 @@ export class AuthService {
           langue: dto.langue ? normaliserLangue(dto.langue) : null,
           role: dto.role ?? Role.PROPRIETAIRE,
           password: await bcrypt.hash(dto.password, BCRYPT_ROUNDS),
-          estVerifie: !verificationRequise,
-          emailVerifieA: verificationRequise ? null : new Date(),
+          estVerifie: true,
+          emailVerifieA: new Date(),
           motDePasseProvisoire: false,
         });
 
@@ -190,17 +181,13 @@ export class AuthService {
 
     this.logger.log(`[register] Compte créé (${saved.id}).`);
 
-    const notification = verificationRequise
-      ? await this.emettreVerification(saved, { inclureBienvenue: true })
-      : await this.envoyerBienvenue(saved, null);
+    const notification = await this.envoyerBienvenue(saved, null);
 
     return {
       ...this.toPublic(saved),
-      message: !verificationRequise
-        ? 'Compte créé. Vous pouvez vous connecter.'
-        : notification.envoye
-          ? 'Compte créé. Un message indiquant votre nom d’utilisateur et le lien de confirmation vous a été envoyé.'
-          : 'Compte créé. Le message de confirmation est en cours d’envoi : vous pouvez le relancer depuis l’application.',
+      message: notification.envoye
+        ? 'Compte créé. Un message de bienvenue vous a été envoyé. Vous pouvez vous connecter.'
+        : 'Compte créé. Vous pouvez vous connecter.',
       emailEnvoye: notification.envoye,
     };
   }
@@ -234,16 +221,6 @@ export class AuthService {
     );
     if (!passwordValid) {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
-    }
-
-    // Vérifié après le contrôle du mot de passe : on ne révèle pas l'état de
-    // vérification d'un compte dont on ne connaît pas le secret.
-    if (this.verificationRequise && !utilisateur.estVerifie) {
-      throw new ApiException(
-        ErrorCode.AUTH_EMAIL_NOT_VERIFIED,
-        MESSAGE_COMPTE_NON_VERIFIE,
-        HttpStatus.FORBIDDEN,
-      );
     }
 
     if (utilisateur.motDePasseProvisoire) {
@@ -640,7 +617,6 @@ export class AuthService {
     // Un responsable ne crée que des comptes AGRICULTEUR rattachés à lui-même :
     // il ne peut pas s'inventer un pair ni un propriétaire.
     const role = Role.AGRICULTEUR;
-    const verificationRequise = this.verificationRequise;
 
     const compte = await this.usernames.avecRepriseSurCollision(
       { nom: dto.nom, prenom: dto.prenom, email },
@@ -656,8 +632,8 @@ export class AuthService {
           proprietaireId: createur.id,
           // Secret inutilisable : seul le titulaire le définira.
           password: await bcrypt.hash(crypto.randomUUID(), BCRYPT_ROUNDS),
-          estVerifie: !verificationRequise,
-          emailVerifieA: verificationRequise ? null : new Date(),
+          estVerifie: true,
+          emailVerifieA: new Date(),
           motDePasseProvisoire: true,
         });
 
@@ -667,7 +643,7 @@ export class AuthService {
     );
 
     const activation = await this.programmerActivation(compte, {
-      verificationRequise,
+      verificationRequise: false,
     });
 
     return {
@@ -894,7 +870,7 @@ export class AuthService {
     }
 
     const resultat = await this.programmerActivation(compte, {
-      verificationRequise: this.verificationRequise && !compte.estVerifie,
+      verificationRequise: false,
     });
 
     return { envoye: resultat.envoye };

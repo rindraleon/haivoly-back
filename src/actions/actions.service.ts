@@ -184,7 +184,11 @@ export class ActionsService {
     return this.actions.find({
       where: {
         userId,
-        syncStatus: In([SyncStatus.FAILED, SyncStatus.INVALID, SyncStatus.CONFLICT]),
+        syncStatus: In([
+          SyncStatus.FAILED,
+          SyncStatus.INVALID,
+          SyncStatus.CONFLICT,
+        ]),
       },
       order: { updatedAt: 'DESC' },
       take: 100,
@@ -215,7 +219,11 @@ export class ActionsService {
         }),
         this.actions.count({
           where: {
-            syncStatus: In([SyncStatus.FAILED, SyncStatus.INVALID, SyncStatus.CONFLICT]),
+            syncStatus: In([
+              SyncStatus.FAILED,
+              SyncStatus.INVALID,
+              SyncStatus.CONFLICT,
+            ]),
           },
         }),
         this.recommendations.count(),

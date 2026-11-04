@@ -57,7 +57,9 @@ export class VerificationEmail1760000000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "EmailVerificationToken" DROP CONSTRAINT "FK_EmailVerificationToken_utilisateur"`,
     );
-    await queryRunner.query(`DROP INDEX "EmailVerificationToken_expiresAt_idx"`);
+    await queryRunner.query(
+      `DROP INDEX "EmailVerificationToken_expiresAt_idx"`,
+    );
     await queryRunner.query(`DROP INDEX "EmailVerificationToken_email_idx"`);
     await queryRunner.query(
       `DROP INDEX "EmailVerificationToken_tokenHash_key"`,
@@ -66,6 +68,8 @@ export class VerificationEmail1760000000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "Utilisateur" DROP COLUMN "emailVerifieA"`,
     );
-    await queryRunner.query(`ALTER TABLE "Utilisateur" DROP COLUMN "estVerifie"`);
+    await queryRunner.query(
+      `ALTER TABLE "Utilisateur" DROP COLUMN "estVerifie"`,
+    );
   }
 }

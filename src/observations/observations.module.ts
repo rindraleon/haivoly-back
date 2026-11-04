@@ -9,7 +9,10 @@ import { Culture } from '../cultures/entities/culture.entity';
 import { Photo } from '../photos/entities/photo.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Observation, Culture, Photo]), UsersModule],
+  imports: [
+    TypeOrmModule.forFeature([Observation, Culture, Photo]),
+    UsersModule,
+  ],
   controllers: [ObservationsController],
   providers: [ObservationsService],
   exports: [ObservationsService],

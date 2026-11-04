@@ -9,7 +9,10 @@ import { PointGPSCulture } from './entities/point-gps-culture.entity';
 import { Recolte } from '../recoltes/entities/recolte.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Culture, PointGPSCulture, Recolte]), UsersModule],
+  imports: [
+    TypeOrmModule.forFeature([Culture, PointGPSCulture, Recolte]),
+    UsersModule,
+  ],
   controllers: [CulturesController],
   providers: [CulturesService],
   exports: [CulturesService],

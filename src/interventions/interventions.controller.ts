@@ -133,7 +133,6 @@ export class InterventionsController {
     return this.interventionsService.remove(cultureId, id, user.id);
   }
 
-
   @Get('interventions/:id')
   findOneFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.interventionsService.findOneById(id, user.id);

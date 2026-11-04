@@ -1,10 +1,4 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 
 import { SynchronizationService } from './synchronization.service';
 import { SyncDto, BatchSyncDto } from '../actions/dto/batch-sync.dto';

@@ -116,7 +116,6 @@ export class ObservationsController {
     return this.observationsService.update(cultureId, id, dto, user.id);
   }
 
-
   @Get('observations/:id')
   findOneFlat(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.observationsService.findOneById(id, user.id);

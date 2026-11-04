@@ -1,4 +1,3 @@
-
 export interface Sommet {
   latitude: number;
   longitude: number;
@@ -111,8 +110,7 @@ export function aDesAutoIntersections(points: readonly Sommet[]): boolean {
       const b2 = points[(j + 1) % n];
 
       // Voisins immédiats (y compris le repli du dernier côté sur le premier).
-      const adjacents =
-        i === j || (i + 1) % n === j || (j + 1) % n === i;
+      const adjacents = i === j || (i + 1) % n === j || (j + 1) % n === i;
       if (adjacents) continue;
 
       if (seCroisent(a1, a2, b1, b2)) return true;
@@ -156,9 +154,9 @@ export function validerGeometrie(
     defauts.push('SOMMETS_IDENTIQUES');
   }
 
-  if (dedupliques.some(
-    (point) => point.latitude === 0 && point.longitude === 0,
-  )) {
+  if (
+    dedupliques.some((point) => point.latitude === 0 && point.longitude === 0)
+  ) {
     defauts.push('SOMMET_ISOLE_ZERO_ZERO');
   }
 
@@ -187,7 +185,8 @@ export function validerGeometrie(
 
 /** Libellé français d'un défaut, pour les messages d'erreur de l'API. */
 export const MESSAGE_PAR_DEFAUT: Record<DefautGeometrie, string> = {
-  TROP_PEU_DE_SOMMETS: 'Une parcelle doit avoir au moins 3 points GPS distincts.',
+  TROP_PEU_DE_SOMMETS:
+    'Une parcelle doit avoir au moins 3 points GPS distincts.',
   COORDONNEES_INVALIDES:
     'Certaines coordonnées GPS sont hors des plages valides (latitude -90/90, longitude -180/180).',
   SOMMETS_IDENTIQUES:

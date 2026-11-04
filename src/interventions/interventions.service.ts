@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 
 import { Intervention } from './entities/intervention.entity';
 import { UsersService } from '../users/users.service';

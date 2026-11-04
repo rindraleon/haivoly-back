@@ -9,7 +9,10 @@ import { PhotoRecolte } from '../photos-recoltes/entities/photo-recolte.entity';
 import { Culture } from '../cultures/entities/culture.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Recolte, PhotoRecolte, Culture]), UsersModule],
+  imports: [
+    TypeOrmModule.forFeature([Recolte, PhotoRecolte, Culture]),
+    UsersModule,
+  ],
   controllers: [RecoltesController],
   providers: [RecoltesService],
   exports: [RecoltesService],

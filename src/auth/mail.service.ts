@@ -50,9 +50,13 @@ export class MailService implements OnModuleInit {
     const user = this.read('MAIL_USER', 'SMTP_USER');
     const password = this.read('MAIL_PASSWORD', 'SMTP_PASSWORD');
     const from = this.read('MAIL_FROM', 'SMTP_FROM');
-    const anyMailValue = [configuredPort, secureValue, user, password, from].some(
-      (value) => value !== undefined && value !== '',
-    );
+    const anyMailValue = [
+      configuredPort,
+      secureValue,
+      user,
+      password,
+      from,
+    ].some((value) => value !== undefined && value !== '');
 
     if (!host) {
       if (production || anyMailValue) {
@@ -70,7 +74,9 @@ export class MailService implements OnModuleInit {
 
     const port = Number(portValue);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-      throw new Error('Configuration SMTP invalide : MAIL_PORT doit être compris entre 1 et 65535.');
+      throw new Error(
+        'Configuration SMTP invalide : MAIL_PORT doit être compris entre 1 et 65535.',
+      );
     }
 
     const secure = this.parseSecure(secureValue, port);
@@ -85,7 +91,9 @@ export class MailService implements OnModuleInit {
       );
     }
     if (!from || !this.mailbox(from)) {
-      throw new Error('Configuration SMTP invalide : MAIL_FROM doit contenir une adresse e-mail valide.');
+      throw new Error(
+        'Configuration SMTP invalide : MAIL_FROM doit contenir une adresse e-mail valide.',
+      );
     }
 
     this.configuration = {
@@ -124,7 +132,9 @@ export class MailService implements OnModuleInit {
     if (this.environment !== 'test') {
       try {
         await this.transporter.verify();
-        this.logger.log('Connexion SMTP vérifiée. Aucun e-mail de test n’a été envoyé.');
+        this.logger.log(
+          'Connexion SMTP vérifiée. Aucun e-mail de test n’a été envoyé.',
+        );
       } catch (error) {
         const code = this.safeErrorCode(error);
         this.logger.error(`Vérification SMTP impossible (code=${code}).`);
@@ -138,7 +148,11 @@ export class MailService implements OnModuleInit {
   }
 
   private get environment(): string {
-    return this.configService.get<string>('NODE_ENV') ?? process.env.NODE_ENV ?? 'development';
+    return (
+      this.configService.get<string>('NODE_ENV') ??
+      process.env.NODE_ENV ??
+      'development'
+    );
   }
 
   private get isProduction(): boolean {
@@ -151,7 +165,8 @@ export class MailService implements OnModuleInit {
 
   /** MAIL_* est prioritaire; SMTP_* est conservé temporairement pour compatibilité. */
   private read(name: string, legacyName?: string): string | undefined {
-    const value = this.configService.get<string>(name) ??
+    const value =
+      this.configService.get<string>(name) ??
       (legacyName ? this.configService.get<string>(legacyName) : undefined);
     const trimmed = value?.trim();
     return trimmed || undefined;
@@ -161,7 +176,9 @@ export class MailService implements OnModuleInit {
     if (value === undefined) return port === 465;
     if (['true', '1'].includes(value.toLowerCase())) return true;
     if (['false', '0'].includes(value.toLowerCase())) return false;
-    throw new Error('Configuration SMTP invalide : MAIL_SECURE doit valoir true ou false.');
+    throw new Error(
+      'Configuration SMTP invalide : MAIL_SECURE doit valoir true ou false.',
+    );
   }
 
   private validateFrontendUrl(value: string, production: boolean): string {
@@ -169,16 +186,24 @@ export class MailService implements OnModuleInit {
     try {
       url = new URL(value);
     } catch {
-      throw new Error('Configuration invalide : FRONTEND_URL doit être une URL absolue valide.');
+      throw new Error(
+        'Configuration invalide : FRONTEND_URL doit être une URL absolue valide.',
+      );
     }
     if (!['http:', 'https:'].includes(url.protocol) || !url.host) {
-      throw new Error('Configuration invalide : FRONTEND_URL doit utiliser HTTP ou HTTPS.');
+      throw new Error(
+        'Configuration invalide : FRONTEND_URL doit utiliser HTTP ou HTTPS.',
+      );
     }
     if (production && url.protocol !== 'https:') {
-      throw new Error('Configuration invalide : FRONTEND_URL doit utiliser HTTPS en production.');
+      throw new Error(
+        'Configuration invalide : FRONTEND_URL doit utiliser HTTPS en production.',
+      );
     }
     if (url.username || url.password || url.search || url.hash) {
-      throw new Error('Configuration invalide : FRONTEND_URL ne doit contenir ni identifiants, ni paramètres, ni fragment.');
+      throw new Error(
+        'Configuration invalide : FRONTEND_URL ne doit contenir ni identifiants, ni paramètres, ni fragment.',
+      );
     }
     return url.toString().replace(/\/$/, '');
   }
@@ -199,7 +224,9 @@ export class MailService implements OnModuleInit {
   /** Envoi réel uniquement : aucun lien/jeton n’est journalisé en mode local. */
   async envoyer(email: ParametresEmail): Promise<void> {
     if (!this.transporter || !this.configuration) {
-      throw new Error('Le service e-mail n’est pas configuré; le message n’a pas été envoyé.');
+      throw new Error(
+        'Le service e-mail n’est pas configuré; le message n’a pas été envoyé.',
+      );
     }
 
     try {
@@ -209,7 +236,9 @@ export class MailService implements OnModuleInit {
       });
       this.logger.log('E-mail transmis au serveur SMTP.');
     } catch (error) {
-      this.logger.error(`Échec de l’envoi SMTP (code=${this.safeErrorCode(error)}).`);
+      this.logger.error(
+        `Échec de l’envoi SMTP (code=${this.safeErrorCode(error)}).`,
+      );
       throw new Error('Le service e-mail est temporairement indisponible.');
     }
   }
@@ -296,10 +325,12 @@ export class MailService implements OnModuleInit {
   }
 
   private buildUrl(page: string, token: string, param: string): string {
-    const base = this.configuration?.frontendUrl ?? this.validateFrontendUrl(
-      this.read('FRONTEND_URL') ?? 'http://localhost:5173',
-      this.isProduction,
-    );
+    const base =
+      this.configuration?.frontendUrl ??
+      this.validateFrontendUrl(
+        this.read('FRONTEND_URL') ?? 'http://localhost:5173',
+        this.isProduction,
+      );
     const url = new URL(base);
     const prefix = url.pathname.replace(/\/+$/, '');
     url.pathname = `${prefix}/${page}`.replace(/^\/$/, `/${page}`);

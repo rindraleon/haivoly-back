@@ -1,4 +1,3 @@
-
 /** Fournisseurs d'e-mail temporaires / jetables connus. */
 export const DOMAINES_JETABLES: ReadonlySet<string> = new Set([
   // Services jetables généralistes
@@ -105,11 +104,15 @@ function ensembleDepuisCsv(valeur: string | undefined): ReadonlySet<string> {
 }
 
 /** Politique lue depuis les variables d'environnement. */
-export function politiqueEmail(env: NodeJS.ProcessEnv = process.env): PolitiqueEmail {
+export function politiqueEmail(
+  env: NodeJS.ProcessEnv = process.env,
+): PolitiqueEmail {
   const brut = env.EMAIL_BLOQUER_JETABLES;
   return {
     bloquerJetables: brut === undefined ? true : brut.toLowerCase() !== 'false',
-    supplementaires: ensembleDepuisCsv(env.EMAIL_DOMAINES_JETABLES_SUPPLEMENTAIRES),
+    supplementaires: ensembleDepuisCsv(
+      env.EMAIL_DOMAINES_JETABLES_SUPPLEMENTAIRES,
+    ),
     ignores: ensembleDepuisCsv(env.EMAIL_DOMAINES_JETABLES_IGNORES),
   };
 }
@@ -131,7 +134,10 @@ export function estSyntaxiquementValide(brut: string): boolean {
   if (email.length === 0 || email.length > 254) return false;
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
 
-  const [local, domaine] = [email.slice(0, email.lastIndexOf('@')), domaineDe(email)];
+  const [local, domaine] = [
+    email.slice(0, email.lastIndexOf('@')),
+    domaineDe(email),
+  ];
   return local.length <= 64 && domaine.length <= 253;
 }
 
@@ -143,7 +149,9 @@ export function estDomaineJetable(
   const domaine = domaineDe(normaliserEmail(brut));
   if (!domaine) return false;
   if (politique.ignores.has(domaine)) return false;
-  return DOMAINES_JETABLES.has(domaine) || politique.supplementaires.has(domaine);
+  return (
+    DOMAINES_JETABLES.has(domaine) || politique.supplementaires.has(domaine)
+  );
 }
 
 export function validerEmailInscription(

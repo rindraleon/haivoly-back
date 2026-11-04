@@ -69,7 +69,10 @@ export class SynchronizationService {
     const identifiantsLocaux = new Map<string, string>();
 
     for (const action of dto.actions ?? []) {
-      const resolue = this.resoudreReferencesLocales(action, identifiantsLocaux);
+      const resolue = this.resoudreReferencesLocales(
+        action,
+        identifiantsLocaux,
+      );
       const resultat = await this.applyAction(userId, resolue, dto.deviceId);
       results.push(resultat);
 
@@ -105,11 +108,17 @@ export class SynchronizationService {
     identifiants: Map<string, string>,
   ): CreateActionDto {
     const resoudre = (value: string | undefined): string | undefined =>
-      value ? identifiants.get(value) ?? value : value;
+      value ? (identifiants.get(value) ?? value) : value;
     const payload = action.payload ? { ...action.payload } : undefined;
 
     if (payload) {
-      for (const key of ['id', 'entityId', 'parcelleId', 'parcelle_id', 'cultureId']) {
+      for (const key of [
+        'id',
+        'entityId',
+        'parcelleId',
+        'parcelle_id',
+        'cultureId',
+      ]) {
         const value = payload[key];
         if (typeof value === 'string') payload[key] = resoudre(value);
       }
@@ -136,7 +145,9 @@ export class SynchronizationService {
       actionType: action.actionType,
     };
 
-    const existing = await this.actions.findOne({ where: { clientId, userId } });
+    const existing = await this.actions.findOne({
+      where: { clientId, userId },
+    });
 
     if (existing && existing.syncStatus === String(SyncStatus.SYNCED)) {
       return {
@@ -264,8 +275,11 @@ export class SynchronizationService {
             : 'FAILED';
 
       journalEntry.syncStatus =
-        status === 'CONFLICT' ? 'CONFLICT' :
-          status === 'INVALID' ? 'INVALID' : SyncStatus.FAILED;
+        status === 'CONFLICT'
+          ? 'CONFLICT'
+          : status === 'INVALID'
+            ? 'INVALID'
+            : SyncStatus.FAILED;
       journalEntry.metadata = {
         ...(journalEntry.metadata ?? {}),
         error: message,

@@ -8,9 +8,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * — les recommandations antérieures au patch restent lisibles, avec un
  * émetteur inconnu affiché tel quel (« — »), jamais inventé.
  */
-export class RecommendationCreateur1810000000000
-  implements MigrationInterface
-{
+export class RecommendationCreateur1810000000000 implements MigrationInterface {
   name = 'RecommendationCreateur1810000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

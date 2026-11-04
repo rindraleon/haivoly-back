@@ -12,7 +12,8 @@ import { buildDataSourceOptions } from './data-source';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const synchronize = config.get<string>('DB_SYNCHRONIZE') === 'true';
-        const environment = config.get<string>('NODE_ENV') ?? process.env.NODE_ENV;
+        const environment =
+          config.get<string>('NODE_ENV') ?? process.env.NODE_ENV;
         if (environment === 'production' && synchronize) {
           throw new Error(
             'Configuration de base de données invalide : DB_SYNCHRONIZE ne peut jamais être activé en production; exécutez les migrations TypeORM.',

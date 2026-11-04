@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, refactor]
+  pull_request:
+    branches: [main, refactor]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (typecheck inclus)
+        run: npm run build
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: dist
+          retention-days: 7
+
+  lint:
+    name: Lint (informatif)
+    runs-on: ubuntu-latest
+    # Le dépôt contient encore des écarts Prettier/ESLint préexistants.
+    # Ce job les rend visibles sans bloquer le build ni le déploiement.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npx eslint "src/**/*.ts"

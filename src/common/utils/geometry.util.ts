@@ -136,7 +136,7 @@ export function validerGeometrie(
     };
   }
 
-  points.forEach((point, index) => {
+  points.forEach((point: Sommet, index) => {
     if (!coordonneesValides(point)) {
       if (!defauts.includes('COORDONNEES_INVALIDES')) {
         defauts.push('COORDONNEES_INVALIDES');

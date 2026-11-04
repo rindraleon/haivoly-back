@@ -83,7 +83,7 @@ export class ParcellesService {
       );
     }
 
-    const sommets = points.map((point) => ({
+    const sommets = points.map((point: Sommet) => ({
       latitude: point.latitude,
       longitude: point.longitude,
     }));

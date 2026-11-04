@@ -63,7 +63,9 @@ export class ActionsController {
     @Query() query: ActionQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const estProprietaire = user.role === Role.PROPRIETAIRE;
+    // `AuthenticatedUser.role` vient du JWT et reste typé `string` côté
+    // transport : on le ramène au domaine avant de le comparer.
+    const estProprietaire = (user.role as Role) === Role.PROPRIETAIRE;
 
     return this.actionsService.findAll({
       ...query,
